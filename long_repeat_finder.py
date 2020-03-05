@@ -552,8 +552,8 @@ def main(name='tandem_repeat', args=None):
                                 lock_up, lock_down, new_range = modify_blast_caused_overlap(new_range, lock_up, lock_down)
                                 debug_info['process'][i].append(new_range)
                                 range_list = new_range
+                            i += 1
                         print(range_list)
-                        debug_info['process'][i].append(range_list)
                         for piece in range_list:
                             seed_ins.trim_seed_island(piece[0], piece[1])
                         print_range_list(range_list, f_all_repeat)
@@ -566,5 +566,4 @@ def main(name='tandem_repeat', args=None):
 
 if __name__ == '__main__':
     main()
-
 
