@@ -477,14 +477,10 @@ def print_range_list(range_list, f_out):
     print(string, file=f_out)
 
 
-def print_debuge_info(debuge_info, f_debuge_info):
+def print_debug_info(debuge_info, f_debuge_info):
     print('fasta_file:', debuge_info['fasta_file'], file=f_debuge_info)
     print('head', debuge_info['head'], file=f_debuge_info)
     print('seed', debuge_info['seed'], file=f_debuge_info)
-    for i in debuge_info['process']:
-        print('i', file=f_debuge_info)
-        for ele in debuge_info['process'][i]:
-            print(ele, file=f_debuge_info)
     return 0 
 
 
@@ -520,44 +516,34 @@ def main(name='tandem_repeat', args=None):
                 seed_ins = Seed_provider(item_sequence, head, source_type='Seq')
                 seeds_ok_blast_res = offer_meanningful_seed(seed_ins, seed_length, blastdb, coverage_cutoff, identity_cutoff, tmp_dir)
                 for seed in seeds_ok_blast_res:
-                    debug_info = {'fasta_file':fasta_file, 'head':head, 'seed':seed, 'process':{}}
-                    i = 1
                     try:
+                        debug_info = {'fasta_file':fasta_file, 'head':head, 'seed':seed}
                         print('seed:',seed)
                         range_list = [ele[:3] for ele in seed]
-                        debug_info['process'][i] = []
-                        debug_info['process'][i].append(range_list)
                         lock_up, lock_down = False, False
-                        debug_info['process'][i].append([lock_up, lock_down])
                         while True:
                             if lock_up and lock_down:
                                 break
                             max_expand_length = decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_seq_length)
-                            debug_info['process'][i].append(max_expand_length)
                             if max_expand_length['up'] == 0:
                                 lock_up = True
                             if max_expand_length['down'] == 0:
                                 lock_down = True
                             range_list_expanded = expand_range(range_list, max_expand_length)
-                            debug_info['process'][i].append(range_list_expanded)
-                            debug_info['process'][i].append([lock_up, lock_down])
                             if not(lock_up and lock_down):
                                 blast_res = blast_expanded_seq(range_list_expanded, item_sequence, blastdb, tmp_dir)
-                                debug_info['process'][i].append(blast_res)
                                 if blast_res == None:
                                     break
                                 lock_up, lock_down, new_range = detect_and_lock_boundary(blast_res, lock_up, lock_down)
-                                debug_info['process'][i].append(new_range)
-                                debug_info['process'][i].append([lock_up, lock_down])
                                 lock_up, lock_down, new_range = modify_blast_caused_overlap(new_range, lock_up, lock_down)
-                                debug_info['process'][i].append(new_range)
                                 range_list = new_range
-                            i += 1
                         print(range_list)
                         for piece in range_list:
                             seed_ins.trim_seed_island(piece[0], piece[1])
                         print_range_list(range_list, f_all_repeat)
                     except:
+                        for ele in seed:
+                            seed_ins.trim_seed_island(ele[0], ele[1])
                         print_debug_info(debug_info, f_debug_info)
         f_all_repeat.close()
         f_debug_info.close()
