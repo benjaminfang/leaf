@@ -3,29 +3,33 @@
 import os
 import time
 import argparse
+import multiprocessing as mp
 import math
 import statistics
 from biolib.bioparser import Fasta_parser
 
 
-def get_args(args_in):
-    args_parser = argparse.ArgumentParser(prog='tandem_repeat', description='This \
+def get_args(args_list):
+    args_parser = argparse.ArgumentParser(prog='long_repeat_finder', description='This \
         utility used to find long repeat sequence among genome.')
     args_parser.add_argument('-D', '--directory_fasta_file', default=None,  help='directory path of fasta file.')
     args_parser.add_argument('-L', '--file_list', default=None, help='file list which want to process.')
-    args_parser.add_argument('-Min', '--min_len', type=int, default=300, help='sequence minimum lenth.')
-    args_parser.add_argument('-Max', '--max_len', type=int, default=20000, help='sequence maximum legth.')
+    args_parser.add_argument('-S', '--seed_length', type=int, default=150, help='seed_length.')
     args_parser.add_argument('-I', '--identity_cutoff', type=float, default=0.9, help='identity cutoff used to filter seed sequence.')
     args_parser.add_argument('-C', '--coverage_cutoff', type=float, default=0.9, help='coverage cutoff used to filter seed sequence.')
-    if args_in:
-        args = args_parser.parse_args(args_in)
+    args_parser.add_argument('-E', '--expand_length', type=int, default=100, help='expanding length when expanding seed.')
+    args_parser.add_argument('-T', 'threads', type=int, default=None, help='threads used.')
+    if args_list:
+        args = args_parser.parse_args(args_list)
     else:
         args = args_parser.parse_args()
-    directory, file_list, min_len, max_len, identity_cutoff, coverage_cutoff = args.directory_fasta_file, args.file_list, \
-        args.min_len, args.max_len, args.identity_cutoff, args.coverage_cutoff
+    directory, file_list, seed_length, identity_cutoff, coverage_cutoff, expand_len, threads = args.directory_fasta_file, args.file_list, \
+        args.seed_length, args.identity_cutoff, args.coverage_cutoff, args.expand_length, args.threads
     if (not (directory or file_list)) or (directory and file_list):
         raise Exception('the directory of file list must offer one.')
-    return directory, file_list, min_len, max_len, identity_cutoff, coverage_cutoff
+    if threads == None:
+        threads = round(os.cpu_count() * 0.6)
+    return directory, file_list, seed_length, identity_cutoff, coverage_cutoff, expand_len, threads
 
 
 class Seed_provider:
@@ -348,7 +352,7 @@ def detect_and_lock_boundary(blast_res_structed, lock_up, lock_down):
             else:
                 ele[0] += up_down_margine['down'] - ele[4]
     for ele in blast_res_structed:
-       dt_out.append(ele[:3]) 
+       dt_out.append(ele[:3])
     return lock_up, lock_down, dt_out
 
 
@@ -451,13 +455,13 @@ def modify_blast_caused_overlap(range_list, lock_up, lock_down):
             elif meet_type == ('u', 'u'):
                 tmp[i][1] += big_move
                 tmp[i + 1][1] -= small_move
-                lock_up = True                 
+                lock_up = True
             elif meet_type == ('d', 'd'):
                 tmp[i][1] += small_move
                 tmp[i + 1][1] -= big_move
                 lock_down = True
 
-    tmp.sort(key= lambda x:x[1])                    
+    tmp.sort(key= lambda x:x[1])
     for i in range(len(tmp))[::2]:
         oritation = (tmp[i][3], tmp[i+1][3])
         if oritation == ('u', 'd'):
@@ -467,79 +471,105 @@ def modify_blast_caused_overlap(range_list, lock_up, lock_down):
     return lock_up, lock_down, dt_out
 
 
-def print_range_list(range_list, f_out):
-    string = ''
-    lengths = []
-    for piece in range_list:
-        string += str(piece[0]) + ',' + str(piece[1]) + ',' + piece[2] + ';'
-        lengths.append(piece[1] - piece[0] + 1)
-    string += str(round(statistics.mean(lengths)))
-    print(string, file=f_out)
+def print_data(data, f_out_name):
+    f_out = open(f_out_name, 'a')
+    print('>' + data['file_name'], file=f_out)
+    for head in data['head']:
+        print('^' + head, file=f_out)
+        for record in data['head'][head]:
+            string = ''
+            lengths = []
+            for piece in record:
+                string += str(piece[0]) + ',' + str(piece[1]) + ',' + piece[2] + ';'
+                lengths.append(piece[1] - piece[0] + 1)
+            string += str(round(statistics.mean(lengths)))
+            print(string, file=f_out)
+    f_out.close()
+
+
+def woker_func(file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock):
+    data_print = {}
+    file_basename = os.path.basename(file_name)
+    data_print['file_name'] = file_basename
+    data_print['head'] = {}
+    fasta_dt = Fasta_parser(file_name)
+    fasta_dt.join_lines()
+    for head in fasta_dt.data:
+        head_name = head.split()[0]
+        data_print['head'][head_name] = []
+        item_sequence = fasta_dt.data[head]
+        whole_seq_length = len(item_sequence)
+        sequence_file = save_seq_as_fasta(item_sequence, 'item_sequence.fasta', sub_tmp_dir)
+        blastdb = makeblastdb(sequence_file, 'blastdb', sub_tmp_dir)
+        seed_ins = Seed_provider(item_sequence, head, source_type='Seq')
+        seeds_ok_blast_res = offer_meanningful_seed(seed_ins, seed_length, blastdb, coverage_cutoff, identity_cutoff, sub_tmp_dir)
+        for seed in seeds_ok_blast_res:
+            try:
+                range_list = [ele[:3] for ele in seed]
+                lock_up, lock_down = False, False
+                while True:
+                    if lock_up and lock_down:
+                        break
+                    max_expand_length = decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_seq_length)
+                    if max_expand_length['up'] == 0:
+                        lock_up = True
+                    if max_expand_length['down'] == 0:
+                        lock_down = True
+                    range_list_expanded = expand_range(range_list, max_expand_length)
+                    if not(lock_up and lock_down):
+                        blast_res = blast_expanded_seq(range_list_expanded, item_sequence, blastdb, sub_tmp_dir)
+                        if blast_res == None:
+                            break
+                        lock_up, lock_down, new_range = detect_and_lock_boundary(blast_res, lock_up, lock_down)
+                        lock_up, lock_down, new_range = modify_blast_caused_overlap(new_range, lock_up, lock_down)
+                        range_list = new_range
+                for piece in range_list:
+                    seed_ins.trim_seed_island(piece[0], piece[1])
+                data_print['head'][head_name].append(range_list)
+            except:
+                lock.acquire()
+                print(file_basename, head_name, seed)
+                lock.release()
+                for ele in seed:
+                    seed_ins.trim_seed_island(ele[0], ele[1])
+    lock.acquire()
+    print_data(data_print, f_all_repeat)
+    lock.release()
 
 
 def main(name='tandem_repeat', args=None):
     myname = 'tandem_repeat'
     if name == myname:
-        directory, file_list, min_len, max_len, coverage_cutoff, identity_cutoff = get_args(args)
+        directory, file_list, seed_length, coverage_cutoff, identity_cutoff, expand_length, threads = get_args(args)
         working_dir = 'working_dir_' + time.strftime('%Y%m%d%H%M%S')
         tmp_dir = os.path.join(working_dir, 'tmp')
-        seed_length = 150  #here I defind seed length.
-        expand_length = 100 # here I defind sequence expand length.
-
+        f_all_repeat = os.path.join(working_dir, 'all_repeat.fasta')
         if not os.path.exists(working_dir):
             os.mkdir(working_dir)
             os.mkdir(tmp_dir)
+            for i in range(threads):
+                os.mkdir(os.path.join(tmp_dir, 'tmp_' + str(i)))
         if directory:
             item_file = [os.path.join(directory, file_name) for file_name in os.listdir(directory)]
         elif file_list:
             item_file = [line.rstrip() for line in open(file_list)]
-        f_all_repeat = open(os.path.join(working_dir, 'all_repeat.fasta'), 'w')
 
-        for fasta_file in item_file:
-            print('>' + os.path.basename(fasta_file), file=f_all_repeat)
-            fasta_dt = Fasta_parser(fasta_file)
-            fasta_dt.join_lines()
-            for head in fasta_dt.data:
-                print('^' + head.split()[0], file=f_all_repeat)
-                item_sequence = fasta_dt.data[head]
-                whole_seq_length = len(item_sequence)
-                sequence_file = save_seq_as_fasta(item_sequence, 'item_sequence.fasta', tmp_dir)
-                blastdb = makeblastdb(sequence_file, 'blastdb', tmp_dir)
-                seed_ins = Seed_provider(item_sequence, head, source_type='Seq')
-                seeds_ok_blast_res = offer_meanningful_seed(seed_ins, seed_length, blastdb, coverage_cutoff, identity_cutoff, tmp_dir)
-                for seed in seeds_ok_blast_res:
-                    try:
-                        print('seed:',seed)
-                        range_list = [ele[:3] for ele in seed]
-                        lock_up, lock_down = False, False
-                        while True:
-                            if lock_up and lock_down:
-                                break
-                            max_expand_length = decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_seq_length)
-                            if max_expand_length['up'] == 0:
-                                lock_up = True
-                            if max_expand_length['down'] == 0:
-                                lock_down = True
-                            range_list_expanded = expand_range(range_list, max_expand_length)
-                            if not(lock_up and lock_down):
-                                blast_res = blast_expanded_seq(range_list_expanded, item_sequence, blastdb, tmp_dir)
-                                if blast_res == None:
-                                    break
-                                lock_up, lock_down, new_range = detect_and_lock_boundary(blast_res, lock_up, lock_down)
-                                lock_up, lock_down, new_range = modify_blast_caused_overlap(new_range, lock_up, lock_down)
-                                range_list = new_range
-                        print(range_list)
-                        for piece in range_list:
-                            seed_ins.trim_seed_island(piece[0], piece[1])
-                        print_range_list(range_list, f_all_repeat)
-                    except:
-                        print('exception:', fasta_file)
-                        for ele in seed:
-                            seed_ins.trim_seed_island(ele[0], ele[1])
-        f_all_repeat.close()
+        lock = mp.Lock()
+        for i in list(range(len(item_file)))[::threads]:
+            files_one_round = item_file[i : i + threads]
+            i = 0
+            p_list = []
+            for file_name in files_one_round:
+                sub_tmp_dir = os.path.join(tmp_dir, 'tmp_' + str(i))
+                p = mp.Process(target=woker_func, args=(file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock))
+                p_list.append(p)
+                i += 1
+            for p in p_list:
+                p.start()
+            for p in p_list:
+                p.join()
     return 0
 
 
 if __name__ == '__main__':
     main()
-
