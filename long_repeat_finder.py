@@ -477,13 +477,6 @@ def print_range_list(range_list, f_out):
     print(string, file=f_out)
 
 
-def print_debug_info(debuge_info, f_debuge_info):
-    print('fasta_file:', debuge_info['fasta_file'], file=f_debuge_info)
-    print('head', debuge_info['head'], file=f_debuge_info)
-    print('seed', debuge_info['seed'], file=f_debuge_info)
-    return 0 
-
-
 def main(name='tandem_repeat', args=None):
     myname = 'tandem_repeat'
     if name == myname:
@@ -501,14 +494,13 @@ def main(name='tandem_repeat', args=None):
         elif file_list:
             item_file = [line.rstrip() for line in open(file_list)]
         f_all_repeat = open(os.path.join(working_dir, 'all_repeat.fasta'), 'w')
-        f_debug_info = open(os.path.join(working_dir, 'debug_info.db'), 'w')
 
         for fasta_file in item_file:
-            print('>' + fasta_file, file=f_all_repeat)
+            print('>' + os.path.basename(fasta_file), file=f_all_repeat)
             fasta_dt = Fasta_parser(fasta_file)
             fasta_dt.join_lines()
             for head in fasta_dt.data:
-                print('^' + head, file=f_all_repeat)
+                print('^' + head.split()[0], file=f_all_repeat)
                 item_sequence = fasta_dt.data[head]
                 whole_seq_length = len(item_sequence)
                 sequence_file = save_seq_as_fasta(item_sequence, 'item_sequence.fasta', tmp_dir)
@@ -517,7 +509,6 @@ def main(name='tandem_repeat', args=None):
                 seeds_ok_blast_res = offer_meanningful_seed(seed_ins, seed_length, blastdb, coverage_cutoff, identity_cutoff, tmp_dir)
                 for seed in seeds_ok_blast_res:
                     try:
-                        debug_info = {'fasta_file':fasta_file, 'head':head, 'seed':seed}
                         print('seed:',seed)
                         range_list = [ele[:3] for ele in seed]
                         lock_up, lock_down = False, False
@@ -542,11 +533,10 @@ def main(name='tandem_repeat', args=None):
                             seed_ins.trim_seed_island(piece[0], piece[1])
                         print_range_list(range_list, f_all_repeat)
                     except:
+                        print('exception:', fasta_file)
                         for ele in seed:
                             seed_ins.trim_seed_island(ele[0], ele[1])
-                        print_debug_info(debug_info, f_debug_info)
         f_all_repeat.close()
-        f_debug_info.close()
     return 0
 
 
