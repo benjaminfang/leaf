@@ -24,18 +24,19 @@ def get_args(arg_list):
 
 def structure_file(file_name):
     def structure_line(line):
-        data_out = [ele.split(',') for ele in line.split(';')[:-1]]
-        for ele in data_out:
-            ele[0] = int(ele[0])
-            ele[1] = int(ele[1])
+        data_out = line.split(';')
+        data_out[-1] = int(data_out[-1])
+        for i in range(len(data_out) - 1):
+            data_out[i] = data_out[i].split(',')
+            data_out[i][0] = int(data_out[i][0])
+            data_out[i][1] = int(data_out[i][1])
         return data_out
-
 
     data_out = {}
     all_lines = [line.rstrip() for line in open(file_name)]
     for line in all_lines:
         if line[0] == '>':
-            fasta_file = os.path.basename(line[1:])
+            fasta_file = line[1:]
             data_out[fasta_file] = {}
         elif line[0] == '^':
             head_name = line[1:]
@@ -103,16 +104,20 @@ def structure_blast_res(query_seq_length, blast_result_file):
 
 
 def append_sequence(repeat_data, fasta_dir):
-    fasta_dir_data = {ff:os.path.join(fasta_dir, ff) for ff in os.listdir(fasta_dir)}
+    fasta_dir_data = {ff: os.path.join(fasta_dir, ff) for ff in os.listdir(fasta_dir)}
     for fasta_file in repeat_data:
         fasta_file_path = fasta_dir_data[fasta_file]
         fasta_data = Fasta_parser(fasta_file_path)
         fasta_data.join_lines()
         fasta_data = fasta_data.data
         for head in repeat_data[fasta_file]:
+            for head_fasta_file in fasta_data:
+                if head == head_fasta_file.split()[0]:
+                    whole_seq = fasta_data[head_fasta_file]
+                    break
             for record in repeat_data[fasta_file][head]:
                 piece = record[0]
-                seq = fasta_data[head][piece[0] - 1 : piece[1]]
+                seq = whole_seq[piece[0] - 1: piece[1]]
                 if piece[2] == '-':
                     seq = list(seq)
                     seq.reverse()
@@ -128,7 +133,7 @@ def judge_IS(repeat_data_appended, IS_blast_db):
                 query_length = record[0][1] - record[0][0] + 1
                 seq = record[-1]
                 seq_fasta = save_seq_as_fasta(seq, 'seq_tmp.fasta', '.')
-                blast_res = runblast(seq_fasta, 'megablast', IS_blast_db, '.' )
+                blast_res = runblast(seq_fasta, 'megablast', IS_blast_db, '.')
                 blast_res_struced = structure_blast_res(query_length, blast_res)
                 blast_res_struced = [ele for ele in blast_res_struced if ele[-1] >= 0.6 and ele[-2] >= 0.6]
                 if len(blast_res_struced) > 0:
@@ -150,17 +155,19 @@ def output_data_to_file(data, f_out):
                 print(string, file=f_out)
     return 0
 
-def main(name='name', args=None):
+def main(name='name', args_list=None):
     myname = 'name'
     if name == myname:
-        repeat_file, fasta_dir, IS_file = get_args(args)
+        repeat_file, fasta_dir, IS_file = get_args(args_list)
         repeat_data = structure_file(repeat_file)
         repeat_data_appended = append_sequence(repeat_data, fasta_dir)
         IS_blast_db = makeblastdb(IS_file, 'IS_blast_db', '.')
         repeat_data_IS = judge_IS(repeat_data_appended, IS_blast_db)
         f_out = open('repeat_IS_judeged.fasta', 'w')
-        output_data_to_file(repeat_data_IS, f_out)
+        f_out_2 = open('repeat_IS.fasta', 'w')
+        output_data_to_file(repeat_data_IS, f_out, f_out_2)
         f_out.close()
+        f_out_2.close()
     return 0
 
 
