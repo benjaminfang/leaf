@@ -3,8 +3,6 @@
 
 import os
 import argparse
-import statistics
-import math
 from biolib.bioparser import Fasta_parser
 from biolib.biocodon import base_complement
 
@@ -47,6 +45,29 @@ def structure_file(file_name):
     return data_out
 
 
+def append_sequence(repeat_data, fasta_dir):
+    fasta_dir_data = {ff: os.path.join(fasta_dir, ff) for ff in os.listdir(fasta_dir)}
+    for fasta_file in repeat_data:
+        fasta_file_path = fasta_dir_data[fasta_file]
+        fasta_data = Fasta_parser(fasta_file_path)
+        fasta_data.join_lines()
+        fasta_data = fasta_data.data
+        for head in repeat_data[fasta_file]:
+            for head_fasta_file in fasta_data:
+                if head == head_fasta_file.split()[0]:
+                    whole_seq = fasta_data[head_fasta_file]
+                    break
+            for record in repeat_data[fasta_file][head]:
+                piece = record[0]
+                seq = whole_seq[piece[0] - 1: piece[1]]
+                if piece[2] == '-':
+                    seq = list(seq)
+                    seq.reverse()
+                    seq = ''.join([base_complement[base] for base in seq])
+                record.append(seq)
+    return repeat_data
+
+
 def save_seq_as_fasta(seq, file_name, directory):
     f_path = os.path.join(directory, file_name)
     f_out = open(f_path, 'w')
@@ -80,14 +101,14 @@ def runblast(item_file, task, db_path, directory):
     return blast_res
 
 
-def structure_blast_res(query_seq_length, blast_result_file):
+def structure_blast_res(db_length, blast_result_file):
     # this function is used to structure blast result in format 7.
     dt_out = []
     a_lines = [line.rstrip().split() for line in open(blast_result_file) if line[0] != '#']
     for line in a_lines:
+        sub_head = line[1]
+        sub_len = db_length[sub_head]
         identity = round(float(line[2])/100, 5)
-        q_s = int(line[6])
-        q_e = int(line[7])
         s_s = int(line[8])
         s_e = int(line[9])
         if s_s <= s_e:
@@ -95,65 +116,44 @@ def structure_blast_res(query_seq_length, blast_result_file):
         else:
             origntation = '-'
             s_s, s_e = s_e, s_s
-        up_margine = q_s - 1
-        down_margine = query_seq_length - q_e
-        coverage = round((q_e - q_s + 1)/query_seq_length, 5)
+        up_margine = s_s - 1
+        down_margine = sub_len - s_e
+        coverage = round((s_e - s_s + 1)/sub_len, 5)
         dt_out.append([s_s, s_e, origntation, up_margine, down_margine, coverage, identity])
     return dt_out
 
 
-
-def append_sequence(repeat_data, fasta_dir):
-    fasta_dir_data = {ff: os.path.join(fasta_dir, ff) for ff in os.listdir(fasta_dir)}
-    for fasta_file in repeat_data:
-        fasta_file_path = fasta_dir_data[fasta_file]
-        fasta_data = Fasta_parser(fasta_file_path)
-        fasta_data.join_lines()
-        fasta_data = fasta_data.data
-        for head in repeat_data[fasta_file]:
-            for head_fasta_file in fasta_data:
-                if head == head_fasta_file.split()[0]:
-                    whole_seq = fasta_data[head_fasta_file]
-                    break
-            for record in repeat_data[fasta_file][head]:
-                piece = record[0]
-                seq = whole_seq[piece[0] - 1: piece[1]]
-                if piece[2] == '-':
-                    seq = list(seq)
-                    seq.reverse()
-                    seq = ''.join([base_complement[base] for base in seq])
-                record.append(seq)
-    return repeat_data
-
-
-def judge_IS(repeat_data_appended, IS_blast_db):
+def judge_IS(repeat_data_appended, IS_blast_db, db_length):
     for fasta_file in repeat_data_appended:
         for head in repeat_data_appended[fasta_file]:
             for record in repeat_data_appended[fasta_file][head]:
-                query_length = record[0][1] - record[0][0] + 1
                 seq = record[-1]
                 seq_fasta = save_seq_as_fasta(seq, 'seq_tmp.fasta', '.')
                 blast_res = runblast(seq_fasta, 'megablast', IS_blast_db, '.')
-                blast_res_struced = structure_blast_res(query_length, blast_res)
+                blast_res_struced = structure_blast_res(db_length, blast_res)
                 blast_res_struced = [ele for ele in blast_res_struced if ele[-1] >= 0.6 and ele[-2] >= 0.6]
                 if len(blast_res_struced) > 0:
-                    record.append('is_IS')
+                    record.append('Yes_IS')
                 else:
-                    record.append('not_IS')
+                    record.append('No_IS')
     return repeat_data_appended
 
 
-def output_data_to_file(data, f_out):
+def output_data_to_file(data, f_out, f_out_2):
     for fasta_file in data:
         print('>' + fasta_file, file=f_out)
+        print('>' + fasta_file, file=f_out_2)
         for head in data[fasta_file]:
             print('^' + head, file=f_out)
+            print('^' + head, file=f_out_2)
             for record in data[fasta_file][head]:
-                ava_len = math.floor(statistics.mean([ele[1] - ele[0] + 1 for ele in record[:-2]]))
-                string = ';'.join([','.join([str(ele[0]), str(ele[1]), ele[2]]) for ele in record[:-2]]) + ';' + str(ava_len) \
+                string = ';'.join([','.join([str(ele[0]), str(ele[1]), ele[2]]) for ele in record[:-3]]) + ';' + str(record[-3]) \
                     + ';' + record[-2] + ';' + record[-1]
                 print(string, file=f_out)
+                if record[-1] == 'Yes_IS':
+                    print(string, file=f_out_2)
     return 0
+
 
 def main(name='name', args_list=None):
     myname = 'name'
@@ -162,7 +162,13 @@ def main(name='name', args_list=None):
         repeat_data = structure_file(repeat_file)
         repeat_data_appended = append_sequence(repeat_data, fasta_dir)
         IS_blast_db = makeblastdb(IS_file, 'IS_blast_db', '.')
-        repeat_data_IS = judge_IS(repeat_data_appended, IS_blast_db)
+        db_fasta_data = Fasta_parser(IS_file)
+        db_fasta_data.join_lines()
+        db_fasta_data.trim_head()
+        db_length = {}
+        for head in db_fasta_data.data:
+            db_length[head] = len(db_fasta_data.data[head])
+        repeat_data_IS = judge_IS(repeat_data_appended, IS_blast_db, db_length)
         f_out = open('repeat_IS_judeged.fasta', 'w')
         f_out_2 = open('repeat_IS.fasta', 'w')
         output_data_to_file(repeat_data_IS, f_out, f_out_2)
@@ -173,5 +179,3 @@ def main(name='name', args_list=None):
 
 if __name__ == '__main__':
     main()
-
-
