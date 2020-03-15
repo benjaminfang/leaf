@@ -18,7 +18,7 @@ def get_args(args_list):
     args_parser.add_argument('-I', '--identity_cutoff', type=float, default=0.9, help='identity cutoff used to filter seed sequence.')
     args_parser.add_argument('-C', '--coverage_cutoff', type=float, default=0.9, help='coverage cutoff used to filter seed sequence.')
     args_parser.add_argument('-E', '--expand_length', type=int, default=100, help='expanding length when expanding seed.')
-    args_parser.add_argument('-T', 'threads', type=int, default=None, help='threads used.')
+    args_parser.add_argument('-T', '--threads', type=int, default=None, help='threads used.')
     if args_list:
         args = args_parser.parse_args(args_list)
     else:
