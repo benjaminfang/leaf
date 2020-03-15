@@ -41,14 +41,12 @@ def parse_gff_file(gff_file):
 
 def structure_repeat_data(file_name):
     def structure_line(line):
-        data_out = line.split(';')
-        tmp = []
-        for ele in data_out[:-3]:
-            ele = ele.split(',')
-            ele[0] = int(ele[0])
-            ele[1] = int(ele[1])
-            tmp.append(ele)
-        data_out = tmp + data_out[-3:]
+        data_out = []
+        tmp = line.split('\t')
+        for i in list(range(len(tmp) - 3))[::3]:
+            data_out.append([int(tmp[i]), int(tmp[i + 1]), tmp[i + 2]])
+        data_out.append(int(tmp[-3]))
+        data_out += tmp[-2:]
         return data_out
 
 
@@ -104,8 +102,8 @@ def output_to_file(data, f_out):
             info_type = dt_in[range_piece]['info_type']
             strand = dt_in[range_piece]['strand']
             attr = dt_in[range_piece]['attributes']
-            string.append('\t'.join([start, end, strand, info_type, attr]))
-        dt_out = '|'.join(string)
+            string.append('' + '\t' + '\t'.join([start, end, strand, info_type, attr]))
+        dt_out = string
         return dt_out
 
 
@@ -115,12 +113,13 @@ def output_to_file(data, f_out):
             print('^' + head, file=f_out)
             for record in data[fasta_file][head]:
                 p1 = record[:-4]
-                p1 = ';'.join([','.join([str(ele[0]), str(ele[1]), ele[2]]) for ele in p1])
-                p2 = ';'.join(record[-4:-1])
-                print(p1, p2, sep=';', file=f_out)
+                p1 = '\t'.join(['\t'.join([str(ele[0]), str(ele[1]), ele[2]]) for ele in p1])
+                p2 = '\t'.join([str(record[-4])]+ record[-3:-1])
+                print(p1, p2, sep='\t', file=f_out)
                 p3 = record[-1]
                 p3 = make_line(p3)
-                print(p3, file=f_out)
+                for ele in p3:
+                    print(ele, file=f_out)
     return 0
 
 
@@ -130,9 +129,9 @@ def main(name='name', args=None):
         repeat_file, gff_dir = get_args(args)
         f_out = open('repeat_annotated.fasta', 'w')
         repeat_data = structure_repeat_data(repeat_file)
-        gff_file_dic = {ff:os.path.join(gff_dir, ff) for ff in os.listdir(gff_dir)}
+        gff_file_dic = {ff.split('.')[0]: os.path.join(gff_dir, ff) for ff in os.listdir(gff_dir)}
         for fasta_file in repeat_data:
-            gff_data = parse_gff_file(gff_file_dic[fasta_file[:-3] + 'gff'])
+            gff_data = parse_gff_file(gff_file_dic[fasta_file.split('.')[0]])
             for head in repeat_data[fasta_file]:
                 gff_head = gff_data[head]
                 for record in repeat_data[fasta_file][head]:

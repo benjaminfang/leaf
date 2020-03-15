@@ -22,13 +22,13 @@ def get_args(arg_list):
 
 def structure_file(file_name):
     def structure_line(line):
-        data_out = line.split(';')
-        data_out[-1] = int(data_out[-1])
-        for i in range(len(data_out) - 1):
-            data_out[i] = data_out[i].split(',')
-            data_out[i][0] = int(data_out[i][0])
-            data_out[i][1] = int(data_out[i][1])
+        data_out = []
+        tmp = line.split('\t')
+        for i in list(range(len(tmp) - 1))[::3]:
+            data_out.append([int(tmp[i]), int(tmp[i + 1]), tmp[i + 2]])
+        data_out.append(int(tmp[-1]))
         return data_out
+
 
     data_out = {}
     all_lines = [line.rstrip() for line in open(file_name)]
@@ -147,8 +147,8 @@ def output_data_to_file(data, f_out, f_out_2):
             print('^' + head, file=f_out)
             print('^' + head, file=f_out_2)
             for record in data[fasta_file][head]:
-                string = ';'.join([','.join([str(ele[0]), str(ele[1]), ele[2]]) for ele in record[:-3]]) + ';' + str(record[-3]) \
-                    + ';' + record[-2] + ';' + record[-1]
+                string = '\t'.join(['\t'.join([str(ele[0]), str(ele[1]), ele[2]]) for ele in record[:-3]]) + '\t' + str(record[-3]) \
+                    + '\t' + record[-2] + '\t' + record[-1]
                 print(string, file=f_out)
                 if record[-1] == 'Yes_IS':
                     print(string, file=f_out_2)
