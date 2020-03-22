@@ -558,13 +558,13 @@ def main(name='tandem_repeat', args=None):
         lock = mp.Lock()
         for i in list(range(len(item_file)))[::threads]:
             files_one_round = item_file[i : i + threads]
-            i = 0
+            j = 0
             p_list = []
             for file_name in files_one_round:
-                sub_tmp_dir = os.path.join(tmp_dir, 'tmp_' + str(i))
+                sub_tmp_dir = os.path.join(tmp_dir, 'tmp_' + str(j))
                 p = mp.Process(target=woker_func, args=(file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock))
                 p_list.append(p)
-                i += 1
+                j += 1
             for p in p_list:
                 p.start()
             for p in p_list:
