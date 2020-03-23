@@ -33,7 +33,7 @@ def get_args(args_list):
 
 
 class Seed_provider:
-    def __init__(self, data_source, seq_name = None, source_type = 'File'):
+    def __init__(self, data_source, seq_name=None, source_type='File'):
         if source_type == 'File':
             data = Fasta_parser(data_source)
             if len(data.data) > 1:
@@ -95,7 +95,7 @@ class Seed_provider:
             seed_start = self.seed_pointer + 1
             seed_end = self.seed_pointer + seed_length
             if self.judge_seed_on_island(seed_start, seed_end):
-                seed_sequence = self.sequence[seed_start - 1 : seed_end]
+                seed_sequence = self.sequence[seed_start - 1: seed_end]
                 self.trim_seed_island(seed_start, seed_end)
                 self.seed_pointer = seed_end
                 return (seed_start, seed_end, seed_sequence)
@@ -173,7 +173,7 @@ def check_blast_res_overlap(blast_res_structed):
         ranges.append([i, ele[0]])
         ranges.append([i, ele[1]])
         i += 1
-    ranges.sort(key=lambda x:x[1])
+    ranges.sort(key=lambda x: x[1])
     for i in list(range(len(ranges)))[::2]:
         if ranges[i][0] != ranges[i+1][0]:
             return False
@@ -208,17 +208,17 @@ def decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_s
             tmp.append([i, ele[0], 'l', 'd'])
             tmp.append([i, ele[1], 'r', 'u'])
         i += 1
-    tmp.sort(key = lambda x:x[1])
+    tmp.sort(key=lambda x: x[1])
     for i in list(range(len(tmp)))[::2]:
         if tmp[i][0] != tmp[i + 1][0]:
             print('WARNING: overlap fonund.')
-            return {'up':0, 'down':0}
+            return {'up': 0, 'down': 0}
 
-    expand_lens = {'up':[], 'down':[]}
+    expand_lens = {'up': [], 'down': []}
     first_point = tmp[0]
     last_point = tmp[-1]
     if lock_up and lock_down:
-        return {'up':0, 'down':0}
+        return {'up': 0, 'down': 0}
     elif lock_up and not lock_down:
         expand_lens['up'].append(0)
         if first_point[3] == 'd':
@@ -243,7 +243,7 @@ def decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_s
             expand_lens['up'].append(whole_seq_length - last_point[1])
         for i in list(range(1, len(tmp) - 1))[::2]:
             gap = tmp[i + 1][1] - tmp[i][1] - 1
-            if gap <0:
+            if gap < 0:
                 gap = 0
             gap_half = math.floor(gap/2)
             gap_type = (tmp[i][3], tmp[i + 1][3])
@@ -269,6 +269,8 @@ def decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_s
             expand_lens['down'].append(gap_half)
     up_max_expand = min(expand_lens['up'])
     down_max_expand = min(expand_lens['down'])
+    if up_max_expand < 0 or down_max_expand < 0:
+        print('opps')
     if up_max_expand > expand_length:
         up_max_expand = expand_length
     if down_max_expand > expand_length:
@@ -285,7 +287,7 @@ def expand_range(range_list, max_expand_length):
             dt_out.append([ele[0] - up_expand, ele[1] + down_expand, ele[2]])
         else:
             dt_out.append([ele[0] - down_expand, ele[1] + up_expand, ele[2]])
-    dt_out.sort(key=lambda x:x[0])
+    dt_out.sort(key=lambda x: x[0])
     return dt_out
 
 
@@ -296,12 +298,12 @@ def blast_expanded_seq(range_list, item_sequence, blastdb, directory):
             dt_out[(ele[0], ele[1])] = []
         for ele in blast_res_structed:
             for ele2 in dt_out:
-                if ele[0] >=  (ele2[0] - 10) and ele[1] <= (ele2[1] + 10):
+                if ele[0] >= (ele2[0] - 10) and ele[1] <= (ele2[1] + 10):
                     dt_out[ele2].append([ele, ele[1] - ele[0] + 1])
         tmp = []
         for ele in dt_out:
             if len(dt_out[ele]) >= 1:
-                dt_out[ele].sort(key = lambda x:x[1])
+                dt_out[ele].sort(key=lambda x: x[1])
                 tmp.append(dt_out[ele][-1][0])
             else:
                 tmp.append(None)
@@ -327,7 +329,7 @@ def blast_expanded_seq(range_list, item_sequence, blastdb, directory):
 
 def detect_and_lock_boundary(blast_res_structed, lock_up, lock_down):
     dt_out = []
-    up_down_margine = {'up':[], 'down':[]}
+    up_down_margine = {'up': [], 'down': []}
     margine_cutoff = 25
     for ele in blast_res_structed:
         up_down_margine['up'].append(ele[3])
@@ -337,7 +339,7 @@ def detect_and_lock_boundary(blast_res_structed, lock_up, lock_down):
 
     if lock_up and lock_down:
         dt_out = [ele[:3] for ele in blast_res_structed]
-    if (not lock_up) and  up_down_margine['up'] > margine_cutoff:
+    if (not lock_up) and up_down_margine['up'] > margine_cutoff:
         lock_up = True
         for ele in blast_res_structed:
             if ele[2] == '+':
@@ -352,7 +354,7 @@ def detect_and_lock_boundary(blast_res_structed, lock_up, lock_down):
             else:
                 ele[0] += up_down_margine['down'] - ele[4]
     for ele in blast_res_structed:
-       dt_out.append(ele[:3])
+        dt_out.append(ele[:3])
     return lock_up, lock_down, dt_out
 
 
@@ -368,7 +370,7 @@ def modify_blast_caused_overlap(range_list, lock_up, lock_down):
             tmp.append([i, ele[0], 'l', 'd'])
             tmp.append([i, ele[1], 'r', 'u'])
         i += 1
-    tmp.sort(key = lambda x:x[1])
+    tmp.sort(key=lambda x: x[1])
     for i in list(range(1, len(tmp) - 1))[::2]:
         meet_type = (tmp[i][3], tmp[i+1][3])
         if (tmp[i][0] < tmp[i + 1][0]) and (tmp[i][1] == tmp[i + 1][1]):
@@ -461,7 +463,7 @@ def modify_blast_caused_overlap(range_list, lock_up, lock_down):
                 tmp[i + 1][1] -= big_move
                 lock_down = True
 
-    tmp.sort(key= lambda x:x[1])
+    tmp.sort(key=lambda x: x[1])
     for i in range(len(tmp))[::2]:
         oritation = (tmp[i][3], tmp[i+1][3])
         if oritation == ('u', 'd'):
@@ -557,7 +559,7 @@ def main(name='tandem_repeat', args=None):
 
         lock = mp.Lock()
         for i in list(range(len(item_file)))[::threads]:
-            files_one_round = item_file[i : i + threads]
+            files_one_round = item_file[i: i + threads]
             j = 0
             p_list = []
             for file_name in files_one_round:
