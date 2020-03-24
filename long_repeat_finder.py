@@ -493,6 +493,7 @@ def print_data(data, f_out_name):
 def woker_func(args_in):
     file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat = args_in
     os.mkdir(sub_tmp_dir)
+    max_expand_time = 12500
     data_print = {}
     file_basename = os.path.basename(file_name)
     data_print['file_name'] = file_basename
@@ -508,7 +509,6 @@ def woker_func(args_in):
         blastdb = makeblastdb(sequence_file, 'blastdb', sub_tmp_dir)
         seed_ins = Seed_provider(item_sequence, head, source_type='Seq')
         seeds_ok_blast_res = offer_meanningful_seed(seed_ins, seed_length, blastdb, coverage_cutoff, identity_cutoff, sub_tmp_dir)
-        max_expand_time = 12500
         for seed in seeds_ok_blast_res:
             try:
                 range_list = [ele[:3] for ele in seed]
