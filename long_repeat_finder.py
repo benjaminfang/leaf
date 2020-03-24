@@ -490,7 +490,9 @@ def print_data(data, f_out_name):
     f_out.close()
 
 
-def woker_func(file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock):
+def woker_func(args_in):
+    file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat = args_in
+    os.mkdir(sub_tmp_dir)
     data_print = {}
     file_basename = os.path.basename(file_name)
     data_print['file_name'] = file_basename
@@ -506,11 +508,16 @@ def woker_func(file_name, seed_length, coverage_cutoff, identity_cutoff, expand_
         blastdb = makeblastdb(sequence_file, 'blastdb', sub_tmp_dir)
         seed_ins = Seed_provider(item_sequence, head, source_type='Seq')
         seeds_ok_blast_res = offer_meanningful_seed(seed_ins, seed_length, blastdb, coverage_cutoff, identity_cutoff, sub_tmp_dir)
+        max_expand_time = 12500
         for seed in seeds_ok_blast_res:
             try:
                 range_list = [ele[:3] for ele in seed]
                 lock_up, lock_down = False, False
+                expand_count = 0
                 while True:
+                    expand_count += 1
+                    if expand_count > max_expand_time:
+                        break
                     if lock_up and lock_down:
                         break
                     max_expand_length = decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_seq_length)
@@ -538,10 +545,11 @@ def woker_func(file_name, seed_length, coverage_cutoff, identity_cutoff, expand_
     lock.acquire()
     print_data(data_print, f_all_repeat)
     lock.release()
+    os.removedirs(sub_tmp_dir)
 
 
-def main(name='tandem_repeat', args=None):
-    myname = 'tandem_repeat'
+def main(name='long_repeat_finder', args=None):
+    myname = 'long_repeat_finder'
     if name == myname:
         directory, file_list, seed_length, coverage_cutoff, identity_cutoff, expand_length, threads = get_args(args)
         working_dir = 'working_dir_' + time.strftime('%Y%m%d%H%M%S')
@@ -550,27 +558,20 @@ def main(name='tandem_repeat', args=None):
         if not os.path.exists(working_dir):
             os.mkdir(working_dir)
             os.mkdir(tmp_dir)
-            for i in range(threads):
-                os.mkdir(os.path.join(tmp_dir, 'tmp_' + str(i)))
         if directory:
             item_file = [os.path.join(directory, file_name) for file_name in os.listdir(directory)]
         elif file_list:
             item_file = [line.rstrip() for line in open(file_list)]
 
         lock = mp.Lock()
-        for i in list(range(len(item_file)))[::threads]:
-            files_one_round = item_file[i: i + threads]
-            j = 0
-            p_list = []
-            for file_name in files_one_round:
-                sub_tmp_dir = os.path.join(tmp_dir, 'tmp_' + str(j))
-                p = mp.Process(target=woker_func, args=(file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock))
-                p_list.append(p)
-                j += 1
-            for p in p_list:
-                p.start()
-            for p in p_list:
-                p.join()
+        args_list = []
+        i = 0
+        for file_name in item_file:
+            args_list.append([file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, \
+                os.path.join(tmp_dir, 'tmp_' + str(i)), f_all_repeat])
+            i += 1
+        pool = mp.Pool(threads)
+        pool.map(woker_func, args_list)
     return 0
 
 
