@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 
 import os
+import shutil
 import time
 import argparse
 import multiprocessing as mp
@@ -491,7 +492,7 @@ def print_data(data, f_out_name):
 
 
 def woker_func(args_in):
-    file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat = args_in
+    file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock = args_in
     os.mkdir(sub_tmp_dir)
     max_expand_time = 12500
     data_print = {}
@@ -545,7 +546,7 @@ def woker_func(args_in):
     lock.acquire()
     print_data(data_print, f_all_repeat)
     lock.release()
-    os.removedirs(sub_tmp_dir)
+    shutil.rmtree(sub_tmp_dir)
 
 
 def main(name='long_repeat_finder', args=None):
@@ -563,12 +564,12 @@ def main(name='long_repeat_finder', args=None):
         elif file_list:
             item_file = [line.rstrip() for line in open(file_list)]
 
-        lock = mp.Lock()
+        lock = mp.Manager().Lock()
         args_list = []
         i = 0
         for file_name in item_file:
             args_list.append([file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, \
-                os.path.join(tmp_dir, 'tmp_' + str(i)), f_all_repeat])
+                os.path.join(tmp_dir, 'tmp_' + str(i)), f_all_repeat, lock])
             i += 1
         pool = mp.Pool(threads)
         pool.map(woker_func, args_list)
