@@ -537,7 +537,7 @@ def woker_func(args_in):
                 for piece in range_list:
                     seed_ins.trim_seed_island(piece[0], piece[1])
                 data_print['head'][head_name].append(range_list)
-            except:
+            except Exception:
                 lock.acquire()
                 print(file_basename, head_name, seed)
                 lock.release()
