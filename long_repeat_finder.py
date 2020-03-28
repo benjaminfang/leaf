@@ -491,7 +491,7 @@ def print_data(data, f_out_name):
     f_out.close()
 
 
-def woker_func(args_in):
+def worker_func(args_in):
     file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock = args_in
     os.mkdir(sub_tmp_dir)
     max_expand_time = 12500
@@ -572,7 +572,7 @@ def main(name='long_repeat_finder', args=None):
                 os.path.join(tmp_dir, 'tmp_' + str(i)), f_all_repeat, lock])
             i += 1
         pool = mp.Pool(threads)
-        pool.map(woker_func, args_list)
+        pool.map(worker_func, args_list)
     return 0
 
 
