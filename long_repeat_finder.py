@@ -272,6 +272,10 @@ def decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_s
     down_max_expand = min(expand_lens['down'])
     if up_max_expand < 0 or down_max_expand < 0:
         print('opps')
+    if up_max_expand < 0:
+        up_max_expand = 0
+    if down_max_expand < 0:
+        down_max_expand = 0
     if up_max_expand > expand_length:
         up_max_expand = expand_length
     if down_max_expand > expand_length:
