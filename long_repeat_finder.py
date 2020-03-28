@@ -124,12 +124,12 @@ def makeblastdb(file_name, dbname, directory):
     return out_path
 
 
-def runblast(item_file, task, db_path, directory):
+def runblast(item_file, task, db_path, directory, out_f):
     cmdname = 'blastn'
     opt_task = '-task ' + task
     opt_query = '-query ' + item_file
     opt_db = '-db ' + db_path
-    blast_res = os.path.join(directory, 'blastres')
+    blast_res = os.path.join(directory, out_f)
     opt_out = '-out ' + blast_res
     opt_outfmt = '-outfmt ' + '7'
     cmd = ' '.join([cmdname, opt_query, opt_db, opt_out, opt_outfmt, opt_task, '&>/dev/null'])
@@ -186,7 +186,7 @@ def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff,
         seed_sequence = seed_instance.next_seed(seed_length)
         if seed_sequence:
             seed_fasta_file = save_seq_as_fasta(seed_sequence[2], 'seed_seq.fasta', directory)
-            blast_res = runblast(seed_fasta_file, 'blastn-short', blastdb, directory)
+            blast_res = runblast(seed_fasta_file, 'blastn-short', blastdb, directory, 'blastres_seed')
             blast_res_structed = structure_blast_res(seed_length, blast_res)
             if len(blast_res_structed) == 0:
                 print('Low complexity seed:', seed_sequence)
@@ -319,7 +319,7 @@ def blast_expanded_seq(range_list, item_sequence, blastdb, directory):
     query_seq_length = query_seq_range[1] - query_seq_range[0] + 1
     query_seq = item_sequence[query_seq_range[0] - 1: query_seq_range[1]]
     query_seq_file = save_seq_as_fasta(query_seq, 'query_expande_seq.fasta', directory)
-    blastres_file = runblast(query_seq_file, 'blastn', blastdb, directory)
+    blastres_file = runblast(query_seq_file, 'blastn', blastdb, directory, 'blastres_expanded')
     blast_res_structed = structure_blast_res(query_seq_length, blastres_file)
     blast_res_structed_filtered = filter_blast_res_in_range(range_list, blast_res_structed)
     if blast_res_structed_filtered == None:
