@@ -206,6 +206,7 @@ def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
 def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff, identity_cutoff, directory):
     while True:
         seed_sequence = seed_instance.next_seed(seed_length)
+        left_boundary = seed_sequence[0]
         if seed_sequence:
             seed_fasta_file = save_seq_as_fasta(seed_sequence[2], 'seed_seq.fasta', directory)
             blast_res = runblast(seed_fasta_file, 'blastn-short', blastdb, directory, 'blastres_seed')
@@ -215,7 +216,7 @@ def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff,
                 continue
             blast_res_structed_filtered, judge_marker = judge_seed(seed_sequence, blast_res_structed, coverage_cutoff, identity_cutoff)
             if judge_marker:
-                yield blast_res_structed_filtered
+                yield blast_res_structed_filtered, left_boundary
         else:
             break
 
@@ -541,7 +542,8 @@ def worker_func(args_in):
         seeds_ok_blast_res = offer_meanningful_seed(seed_ins, seed_length, blastdb, coverage_cutoff, identity_cutoff, sub_tmp_dir)
         for seed in seeds_ok_blast_res:
             try:
-                range_list = [ele[:3] for ele in seed]
+                left_boundary = seed[1]
+                range_list = [ele[:3] for ele in seed[0]]
                 lock_up, lock_down = False, False
                 expand_count = 0
                 while True:
@@ -563,6 +565,8 @@ def worker_func(args_in):
                         lock_up, lock_down, new_range = detect_and_lock_boundary(blast_res, lock_up, lock_down)
                         lock_up, lock_down, new_range = modify_blast_caused_overlap(new_range, lock_up, lock_down)
                         range_list = new_range
+                    if range_list[0][0] < left_boundary - seed_length:
+                        lock_up = True
                 for piece in range_list:
                     seed_ins.trim_seed_island(piece[0], piece[1])
                 data_print['head'][head_name].append(range_list)
