@@ -15,7 +15,7 @@ def get_args(args_list):
         utility used to find long repeat sequence among genome.')
     args_parser.add_argument('-D', '--directory_fasta_file', default=None,  help='directory path of fasta file.')
     args_parser.add_argument('-L', '--file_list', default=None, help='file list which want to process.')
-    args_parser.add_argument('-S', '--seed_length', type=int, default=150, help='seed_length.')
+    args_parser.add_argument('-S', '--seed_length', type=int, default=200, help='seed_length.')
     args_parser.add_argument('-I', '--identity_cutoff', type=float, default=0.9, help='identity cutoff used to filter seed sequence.')
     args_parser.add_argument('-C', '--coverage_cutoff', type=float, default=0.9, help='coverage cutoff used to filter seed sequence.')
     args_parser.add_argument('-E', '--expand_length', type=int, default=100, help='expanding length when expanding seed.')
@@ -181,6 +181,28 @@ def check_blast_res_overlap(blast_res_structed):
     return True
 
 
+def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
+    dt_out = []
+    judge_marker = True
+    for entry in blast_res_structed:
+        if entry[5] >= coverage_cutoff and entry[6] >= identity_cutoff:
+            dt_out.append(entry)
+    dt_out.sort(lambda x:x[0])
+    if dt_out[0][0] != seed_item[0] or dt_out[0][1] != seed_item[1]:
+        judge_marker = False
+    front_ele = dt_out[0]
+    tmp = []
+    tmp.append(front_ele)
+    for ele in dt_out[1:]:
+        if ele[0] > front_ele[1]:
+            tmp.append(ele)
+            front_ele = ele
+    if len(tmp) <= 1:
+        judge_marker = False
+    dt_out = tmp
+    return dt_out, judge_marker
+
+
 def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff, identity_cutoff, directory):
     while True:
         seed_sequence = seed_instance.next_seed(seed_length)
@@ -191,8 +213,8 @@ def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff,
             if len(blast_res_structed) == 0:
                 print('Low complexity seed:', seed_sequence)
                 continue
-            blast_res_structed_filtered = filter_seed_blast_res(blast_res_structed, coverage_cutoff, identity_cutoff)
-            if len(blast_res_structed_filtered) > 1 and check_blast_res_overlap(blast_res_structed_filtered):
+            blast_res_structed_filtered, judge_marker = judge_seed(seed_sequence, blast_res_structed, coverage_cutoff, identity_cutoff)
+            if judge_marker:
                 yield blast_res_structed_filtered
         else:
             break
@@ -292,24 +314,27 @@ def expand_range(range_list, max_expand_length):
             dt_out.append([ele[0] - up_expand, ele[1] + down_expand, ele[2]])
         else:
             dt_out.append([ele[0] - down_expand, ele[1] + up_expand, ele[2]])
-    dt_out.sort(key=lambda x: x[0])
+    # dt_out.sort(key=lambda x: x[0])
     return dt_out
 
 
 def blast_expanded_seq(range_list, item_sequence, blastdb, directory):
     def filter_blast_res_in_range(range_list, blast_res_structed):
         dt_out = {}
+        range_order = []
         for ele in range_list:
             dt_out[(ele[0], ele[1])] = []
+            range_order.append((ele[0], ele[1]))
         for ele in blast_res_structed:
             for ele2 in dt_out:
-                if ele[0] >= (ele2[0] - 10) and ele[1] <= (ele2[1] + 10):
+                if ele[0] >= (ele2[0] - 1) and ele[1] <= (ele2[1] + 1):
                     dt_out[ele2].append([ele, ele[1] - ele[0] + 1])
         tmp = []
-        for ele in dt_out:
+        for ele in range_order:
             if len(dt_out[ele]) >= 1:
-                dt_out[ele].sort(key=lambda x: x[1])
-                tmp.append(dt_out[ele][-1][0])
+                contain_ranged = dt_out[ele]
+                contain_ranged.sort(key=lambda x:x[1])
+                tmp.append(contain_ranged[-1][0])
             else:
                 tmp.append(None)
         dt_out = tmp
