@@ -206,8 +206,8 @@ def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
 def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff, identity_cutoff, directory):
     while True:
         seed_sequence = seed_instance.next_seed(seed_length)
-        left_boundary = seed_sequence[0]
         if seed_sequence:
+            left_boundary = seed_sequence[0]
             seed_fasta_file = save_seq_as_fasta(seed_sequence[2], 'seed_seq.fasta', directory)
             blast_res = runblast(seed_fasta_file, 'blastn-short', blastdb, directory, 'blastres_seed')
             blast_res_structed = structure_blast_res(seed_length, blast_res)
