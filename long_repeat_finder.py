@@ -187,7 +187,7 @@ def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
     for entry in blast_res_structed:
         if entry[5] >= coverage_cutoff and entry[6] >= identity_cutoff:
             dt_out.append(entry)
-    dt_out.sort(lambda x: x[0])
+    dt_out.sort(key=lambda x: x[0])
     if dt_out[0][0] != seed_item[0] or dt_out[0][1] != seed_item[1]:
         judge_marker = False
     front_ele = dt_out[0]
