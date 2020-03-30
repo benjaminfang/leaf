@@ -101,6 +101,7 @@ class Seed_provider:
                 self.seed_pointer = seed_end
                 return (seed_start, seed_end, seed_sequence)
             else:
+                self.trim_seed_island(seed_start, seed_end)
                 self.seed_pointer += seed_length
 
 
@@ -203,6 +204,17 @@ def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
     return dt_out, judge_marker
 
 
+def modify_seed(seed_blast_res):
+    for ele in seed_blast_res:
+        if ele[2] == '+':
+            ele[0] -= ele[3]
+            ele[1] += ele[4]
+        else:
+            ele[0] -= ele[4]
+            ele[1] += ele[3]
+    return seed_blast_res
+
+
 def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff, identity_cutoff, directory):
     while True:
         seed_sequence = seed_instance.next_seed(seed_length)
@@ -216,6 +228,7 @@ def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff,
                 continue
             blast_res_structed_filtered, judge_marker = judge_seed(seed_sequence, blast_res_structed, coverage_cutoff, identity_cutoff)
             if judge_marker:
+                blast_res_structed_filtered = modify_seed(blast_res_structed_filtered)
                 yield blast_res_structed_filtered, left_boundary
         else:
             break
@@ -328,7 +341,7 @@ def blast_expanded_seq(range_list, item_sequence, blastdb, directory):
             range_order.append((ele[0], ele[1]))
         for ele in blast_res_structed:
             for ele2 in dt_out:
-                if ele[0] >= (ele2[0] - 1) and ele[1] <= (ele2[1] + 1):
+                if ele[0] >= (ele2[0] - 5) and ele[1] <= (ele2[1] + 5):
                     dt_out[ele2].append([ele, ele[1] - ele[0] + 1])
         tmp = []
         for ele in range_order:
@@ -368,8 +381,6 @@ def detect_and_lock_boundary(blast_res_structed, lock_up, lock_down):
     up_down_margine['up'] = max(up_down_margine['up'])
     up_down_margine['down'] = max(up_down_margine['down'])
 
-    if lock_up and lock_down:
-        dt_out = [ele[:3] for ele in blast_res_structed]
     if (not lock_up) and up_down_margine['up'] > margine_cutoff:
         lock_up = True
         for ele in blast_res_structed:
@@ -377,6 +388,12 @@ def detect_and_lock_boundary(blast_res_structed, lock_up, lock_down):
                 ele[0] += up_down_margine['up'] - ele[3]
             else:
                 ele[1] -= up_down_margine['up'] - ele[3]
+    else:
+        for ele in blast_res_structed:
+            if ele[2] == '+':
+                ele[0] -= ele[3]
+            else:
+                ele[1] += ele[3]
     if (not lock_down) and up_down_margine['down'] > margine_cutoff:
         lock_down = True
         for ele in blast_res_structed:
@@ -384,6 +401,12 @@ def detect_and_lock_boundary(blast_res_structed, lock_up, lock_down):
                 ele[1] -= up_down_margine['down'] - ele[4]
             else:
                 ele[0] += up_down_margine['down'] - ele[4]
+    else:
+        for ele in blast_res_structed:
+            if ele[2] == '+':
+                ele[1] += ele[4]
+            else:
+                ele[0] -= ele[4]
     for ele in blast_res_structed:
         dt_out.append(ele[:3])
     return lock_up, lock_down, dt_out
