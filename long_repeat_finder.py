@@ -565,7 +565,7 @@ def worker_func(args_in):
         seeds_ok_blast_res = offer_meanningful_seed(seed_ins, seed_length, blastdb, coverage_cutoff, identity_cutoff, sub_tmp_dir)
         for seed in seeds_ok_blast_res:
             try:
-                left_boundary = seed[1]
+                left_boundary = seed[1] - seed_length
                 range_list = [ele[:3] for ele in seed[0]]
                 lock_up, lock_down = False, False
                 expand_count = 0
@@ -588,7 +588,7 @@ def worker_func(args_in):
                         lock_up, lock_down, new_range = detect_and_lock_boundary(blast_res, lock_up, lock_down)
                         lock_up, lock_down, new_range = modify_blast_caused_overlap(new_range, lock_up, lock_down)
                         range_list = new_range
-                    if range_list[0][0] < left_boundary - seed_length:
+                    if range_list[0][0] < left_boundary:
                         lock_up = True
                 for piece in range_list:
                     seed_ins.trim_seed_island(piece[0], piece[1])
