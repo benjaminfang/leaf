@@ -67,11 +67,16 @@ def structure_repeat_data(file_name):
 
 def annotate_range(range_piece, gff_head):
     def extract_info(info_dict):
-        item_priority = ['CDS', 'tRNA', 'rRNA', 'SRP_RNA', 'exon', 'gene', 'pseudogene', 'riboswitch', 'sequence_feature']
+        item_priority = ['CDS', 'tRNA', 'rRNA', 'SRP_RNA', 'exon', 'gene', 'pseudogene', 'riboswitch', 'sequence_feature', 'repeat_region', 'ncRNA']
         tmp = []
-        for info_type in info_dict:
-            tmp.append([info_type, item_priority.index(info_type)])
-        tmp.sort(key=lambda x:x[1])
+        try:
+            for info_type in info_dict:
+                tmp.append([info_type, item_priority.index(info_type)])
+        except KeyError as ex:
+            print(ex, ex.args)
+        if len(tmp) < 1:
+            raise Exception('The len of information is zero.')
+        tmp.sort(key=lambda x: x[1])
         info_choose = tmp[0][0]
         info = info_dict[info_choose]
         strand = info['strand']
@@ -80,7 +85,7 @@ def annotate_range(range_piece, gff_head):
         for key in attr:
             string.append(key + '=' + attr[key])
         string = ';'.join(string)
-        return {'info_type':info_choose, 'strand':strand, 'attributes':string}
+        return {'info_type': info_choose, 'strand': strand, 'attributes': string}
 
 
     dt_out = {}
@@ -114,7 +119,7 @@ def output_to_file(data, f_out):
             for record in data[fasta_file][head]:
                 p1 = record[:-4]
                 p1 = '\t'.join(['\t'.join([str(ele[0]), str(ele[1]), ele[2]]) for ele in p1])
-                p2 = '\t'.join([str(record[-4])]+ record[-3:-1])
+                p2 = '\t'.join([str(record[-4])] + record[-3:-1])
                 print(p1, p2, sep='\t', file=f_out)
                 p3 = record[-1]
                 p3 = make_line(p3)
