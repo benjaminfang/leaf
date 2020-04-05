@@ -77,7 +77,7 @@ class Seed_provider:
                 new_segment = (end + 1, island_end)
                 new_seed_island.append(new_segment)
             else:
-                raise Exception('opps', island)
+                raise Exception('opps in func trim seed island', island)
         new_seed_island.sort()
         self.seed_island = new_seed_island
 
@@ -192,7 +192,7 @@ def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
     try:
         if dt_out[0][0] != seed_item[0] or dt_out[0][1] != seed_item[1]:
             judge_marker = False
-    except Exception as ex:
+    except IndexError as ex:
         print(dt_out, seed_item, ex)
         return dt_out, False
     front_ele = dt_out[0]
@@ -311,7 +311,7 @@ def decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_s
     up_max_expand = min(expand_lens['up'])
     down_max_expand = min(expand_lens['down'])
     if up_max_expand < 0 or down_max_expand < 0:
-        print('opps')
+        print('opps in decide max expand len', up_max_expand, down_max_expand)
     if up_max_expand < 0:
         up_max_expand = 0
     if down_max_expand < 0:
