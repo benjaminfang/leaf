@@ -189,23 +189,20 @@ def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
         if entry[5] >= coverage_cutoff and entry[6] >= identity_cutoff:
             dt_out.append(entry)
     dt_out.sort(key=lambda x: x[0])
-    try:
-        if dt_out[0][0] != seed_item[0] or dt_out[0][1] != seed_item[1]:
-            judge_marker = False
-    except IndexError as ex:
-        print(dt_out, seed_item, ex)
+    if len(dt_out) == 0 or dt_out[0][0] != seed_item[0] or dt_out[0][1] != seed_item[1]:
         return dt_out, False
-    front_ele = dt_out[0]
-    tmp = []
-    tmp.append(front_ele)
-    for ele in dt_out[1:]:
-        if ele[0] > front_ele[1]:
-            tmp.append(ele)
-            front_ele = ele
-    if len(tmp) <= 1:
-        judge_marker = False
-    dt_out = tmp
-    return dt_out, judge_marker
+    else:
+        front_ele = dt_out[0]
+        tmp = []
+        tmp.append(front_ele)
+        for ele in dt_out[1:]:
+            if ele[0] > front_ele[1]:
+                tmp.append(ele)
+                front_ele = ele
+        if len(tmp) <= 1:
+            judge_marker = False
+        dt_out = tmp
+        return dt_out, judge_marker
 
 
 def modify_seed(seed_blast_res):
@@ -223,17 +220,20 @@ def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff,
     while True:
         seed_sequence = seed_instance.next_seed(seed_length)
         if seed_sequence:
-            left_boundary = seed_sequence[0]
-            seed_fasta_file = save_seq_as_fasta(seed_sequence[2], 'seed_seq.fasta', directory)
-            blast_res = runblast(seed_fasta_file, 'blastn-short', blastdb, directory, 'blastres_seed')
-            blast_res_structed = structure_blast_res(seed_length, blast_res)
-            if len(blast_res_structed) == 0:
-                print('Low complexity seed:', seed_sequence)
-                continue
-            blast_res_structed_filtered, judge_marker = judge_seed(seed_sequence, blast_res_structed, coverage_cutoff, identity_cutoff)
-            if judge_marker:
-                blast_res_structed_filtered = modify_seed(blast_res_structed_filtered)
-                yield blast_res_structed_filtered, left_boundary
+            try:
+                left_boundary = seed_sequence[0]
+                seed_fasta_file = save_seq_as_fasta(seed_sequence[2], 'seed_seq.fasta', directory)
+                blast_res = runblast(seed_fasta_file, 'blastn-short', blastdb, directory, 'blastres_seed')
+                blast_res_structed = structure_blast_res(seed_length, blast_res)
+                if len(blast_res_structed) == 0:
+                    print('Low complexity seed:', seed_sequence)
+                    continue
+                blast_res_structed_filtered, judge_marker = judge_seed(seed_sequence, blast_res_structed, coverage_cutoff, identity_cutoff)
+                if judge_marker:
+                    blast_res_structed_filtered = modify_seed(blast_res_structed_filtered)
+                    yield blast_res_structed_filtered, left_boundary
+            except Exception as ex:
+                print('offer seed error:', ex)
         else:
             break
 
