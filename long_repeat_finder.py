@@ -160,26 +160,15 @@ def structure_blast_res(query_seq_length, blast_result_file):
     return dt_out
 
 
-def filter_seed_blast_res(blast_res_structed, coverage_cutoff, identity_cutoff):
-    dt_out = []
-    for entry in blast_res_structed:
-        if entry[5] >= coverage_cutoff and entry[6] >= identity_cutoff:
-            dt_out.append(entry)
-    return dt_out
-
-
-def check_blast_res_overlap(blast_res_structed):
-    ranges = []
-    i = 1
-    for ele in blast_res_structed:
-        ranges.append([i, ele[0]])
-        ranges.append([i, ele[1]])
-        i += 1
-    ranges.sort(key=lambda x: x[1])
-    for i in list(range(len(ranges)))[::2]:
-        if ranges[i][0] != ranges[i+1][0]:
-            return False
-    return True
+def modify_seed(seed_blast_res):
+    for ele in seed_blast_res:
+        if ele[2] == '+':
+            ele[0] -= ele[3]
+            ele[1] += ele[4]
+        else:
+            ele[0] -= ele[4]
+            ele[1] += ele[3]
+    return seed_blast_res
 
 
 def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
@@ -189,9 +178,10 @@ def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
         if entry[5] >= coverage_cutoff and entry[6] >= identity_cutoff:
             dt_out.append(entry)
     dt_out.sort(key=lambda x: x[0])
-    if len(dt_out) == 0 or dt_out[0][0] != seed_item[0] or dt_out[0][1] != seed_item[1]:
+    if len(dt_out) < 2 or dt_out[0][0] != seed_item[0] or dt_out[0][1] != seed_item[1]:
         return dt_out, False
     else:
+        dt_out = modify_seed(dt_out)
         front_ele = dt_out[0]
         tmp = []
         tmp.append(front_ele)
@@ -205,17 +195,6 @@ def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
         return dt_out, judge_marker
 
 
-def modify_seed(seed_blast_res):
-    for ele in seed_blast_res:
-        if ele[2] == '+':
-            ele[0] -= ele[3]
-            ele[1] += ele[4]
-        else:
-            ele[0] -= ele[4]
-            ele[1] += ele[3]
-    return seed_blast_res
-
-
 def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff, identity_cutoff, directory):
     while True:
         seed_sequence = seed_instance.next_seed(seed_length)
@@ -225,15 +204,11 @@ def offer_meanningful_seed(seed_instance, seed_length, blastdb, coverage_cutoff,
                 seed_fasta_file = save_seq_as_fasta(seed_sequence[2], 'seed_seq.fasta', directory)
                 blast_res = runblast(seed_fasta_file, 'blastn-short', blastdb, directory, 'blastres_seed')
                 blast_res_structed = structure_blast_res(seed_length, blast_res)
-                if len(blast_res_structed) == 0:
-                    print('Low complexity seed:', seed_sequence)
-                    continue
                 blast_res_structed_filtered, judge_marker = judge_seed(seed_sequence, blast_res_structed, coverage_cutoff, identity_cutoff)
                 if judge_marker:
-                    blast_res_structed_filtered = modify_seed(blast_res_structed_filtered)
                     yield blast_res_structed_filtered, left_boundary
             except Exception as ex:
-                print('offer seed error:', ex)
+                print('Offer seed error:', ex)
         else:
             break
 
@@ -252,7 +227,7 @@ def decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_s
     tmp.sort(key=lambda x: x[1])
     for i in list(range(len(tmp)))[::2]:
         if tmp[i][0] != tmp[i + 1][0]:
-            print('WARNING: overlap fonund.')
+            print('Warning: overlap fonund.', range_list)
             return {'up': 0, 'down': 0}
 
     expand_lens = {'up': [], 'down': []}
@@ -311,7 +286,7 @@ def decide_expand_max_len(range_list, lock_up, lock_down, expand_length, whole_s
     up_max_expand = min(expand_lens['up'])
     down_max_expand = min(expand_lens['down'])
     if up_max_expand < 0 or down_max_expand < 0:
-        print('opps in decide max expand len', up_max_expand, down_max_expand)
+        print('Opps in decide max expand len', up_max_expand, down_max_expand, range_list)
     if up_max_expand < 0:
         up_max_expand = 0
     if down_max_expand < 0:
