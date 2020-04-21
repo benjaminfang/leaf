@@ -67,12 +67,13 @@ def structure_repeat_data(file_name):
 
 def annotate_range(range_piece, gff_head):
     def extract_info(info_dict):
-        item_priority = ['CDS', 'tRNA', 'rRNA', 'SRP_RNA', 'exon', 'gene', 'pseudogene', 'riboswitch', 'sequence_feature', 'repeat_region', 'ncRNA']
+        item_priority = ['CDS', 'tRNA', 'rRNA', 'SRP_RNA', 'exon', 'gene', 'pseudogene', 'riboswitch', 'sequence_feature', 'repeat_region', 'ncRNA', 'inverted_repeat']
         tmp = []
         try:
             for info_type in info_dict:
                 tmp.append([info_type, item_priority.index(info_type)])
-        except KeyError as ex:
+        except Exception as ex:
+            tmp.append([info_type, 100])
             print(ex, ex.args)
         if len(tmp) < 1:
             raise Exception('The len of information is zero.')
