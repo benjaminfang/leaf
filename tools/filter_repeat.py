@@ -8,14 +8,15 @@ def get_args(arg_list):
     parser.add_argument('-f', required=True, help='file name processing.')
     parser.add_argument('-max_len', type=int, default=None, help='maximal length.')
     parser.add_argument('-min_len', type=int, default=None, help='minimal length.')
-    parser.add_argument('-dis_range', type=int, default=None, help='repeats distributing range length.')
+    parser.add_argument('-dis_range_down', type=int, default=None, help='lower repeats distributing range length.')
+    parser.add_argument('-dis_range_up', type=int, default=None, help='higher repeats distributing range length.')
     parser.add_argument('-gap_len', type=int, default=None, help='gap length.')
     if arg_list:
         args = parser.parse_args(arg_list)
     else:
         args = parser.parse_args()
-    f_name, max_len, min_len, dis_range, gap_len = args.f, args.max_len, args.min_len, args.dis_range, args.gap_len
-    return f_name, max_len, min_len, dis_range, gap_len
+    f_name, max_len, min_len, dis_range_down, dis_range_up, gap_len = args.f, args.max_len, args.min_len, args.dis_range_down, args.dis_range_up, args.gap_len
+    return f_name, max_len, min_len, dis_range_down, dis_range_up, gap_len
 
 
 def structure_file(file_name):
@@ -43,7 +44,7 @@ def structure_file(file_name):
     return data_out
 
 
-def filter_data(data_in, max_len, min_len, dis_range, gap_len):
+def filter_data(data_in, max_len, min_len, dis_range_down, dis_range_up, gap_len):
     def juder(record, max_len, min_len, dis_range, gap_len):
         record = record[:-1]
         elements = [ele[1] - ele[0] + 1 for ele in record]
@@ -59,8 +60,11 @@ def filter_data(data_in, max_len, min_len, dis_range, gap_len):
         if min_len:
             if min_piece < min_len:
                 return False
-        if dis_range:
-            if range_len > dis_range:
+        if dis_range_down:
+            if range_len <= dis_range_down:
+                return False
+        if dis_range_up:
+            if range_len > dis_range_up:
                 return False
         if gap_len:
             if max_gaps > gap_len:
@@ -74,7 +78,7 @@ def filter_data(data_in, max_len, min_len, dis_range, gap_len):
         for head in data_in[fasta_file]:
             data_out[fasta_file][head] = []
             for record in data_in[fasta_file][head]:
-                if juder(record, max_len, min_len, dis_range, gap_len):
+                if juder(record, max_len, min_len, dis_range_down, dis_range_up,  gap_len):
                     data_out[fasta_file][head].append(record)
     return data_out
 
@@ -93,10 +97,10 @@ def output_data_to_file(file_data_filtered, f_out):
 def main(called_name='name', args=None):
     my_name = 'name'
     if my_name == called_name:
-        f_name, max_len, min_len, dis_range, gap_len = get_args(args)
+        f_name, max_len, min_len, dis_range_down, dis_range_up, gap_len = get_args(args)
         f_out = open('repeat_filtered.fasta', 'w')
         file_data = structure_file(f_name)
-        file_data_filtered = filter_data(file_data, max_len, min_len, dis_range, gap_len)
+        file_data_filtered = filter_data(file_data, max_len, min_len, dis_range_down, dis_range_up, gap_len)
         output_data_to_file(file_data_filtered, f_out)
         f_out.close()
     return 0
