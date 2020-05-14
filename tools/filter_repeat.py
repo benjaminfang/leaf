@@ -45,7 +45,7 @@ def structure_file(file_name):
 
 
 def filter_data(data_in, max_len, min_len, dis_range_down, dis_range_up, gap_len):
-    def juder(record, max_len, min_len, dis_range, gap_len):
+    def juder(record, max_len, min_len, dis_range_down, dis_range_up,  gap_len):
         record = record[:-1]
         elements = [ele[1] - ele[0] + 1 for ele in record]
         elements.sort()
