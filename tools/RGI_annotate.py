@@ -32,7 +32,7 @@ def output_data(data):
     for strain in data:
         for cont in data[strain]:
             for rep in data[strain][cont]:
-                print('>' + strain + '\t' + cont + '\t' + '\t'.join(rep[0][:2]))
+                print('>' + strain + '\t' + cont + '\t' + '\t'.join([str(rep[0][0]), str(rep[0][1])]))
                 print(rep[-2])
     return 0
 
