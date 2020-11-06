@@ -7,15 +7,15 @@ import argparse
 import multiprocessing as mp
 import math
 import statistics
-from biolib.bioparser import Fasta_parser
+from biolib import Fasta_parser
 
 
 def get_args(args_list):
     args_parser = argparse.ArgumentParser(prog='long_repeat_finder', description='This \
-        utility used to find long repeat sequence among genome.')
+        utility is used to find long repeating sequence among genomes.')
     args_parser.add_argument('-D', '--directory_fasta_file', default=None,  help='directory path of fasta file.')
     args_parser.add_argument('-L', '--file_list', default=None, help='file list which want to process.')
-    args_parser.add_argument('-S', '--seed_length', type=int, default=200, help='seed_length.')
+    args_parser.add_argument('-S', '--seed_length', type=int, default=200, help='initial seed length.')
     args_parser.add_argument('-I', '--identity_cutoff', type=float, default=0.9, help='identity cutoff used to filter seed sequence.')
     args_parser.add_argument('-C', '--coverage_cutoff', type=float, default=0.9, help='coverage cutoff used to filter seed sequence.')
     args_parser.add_argument('-E', '--expand_length', type=int, default=100, help='expanding length when expanding seed.')
@@ -590,7 +590,7 @@ def main(name='long_repeat_finder', args=None):
         directory, file_list, seed_length, coverage_cutoff, identity_cutoff, expand_length, threads = get_args(args)
         working_dir = 'working_dir_' + time.strftime('%Y%m%d%H%M%S')
         tmp_dir = os.path.join(working_dir, 'tmp')
-        f_all_repeat = os.path.join(working_dir, 'all_repeat.fasta')
+        f_all_repeat = os.path.join(working_dir, 'repeats_result.fasta')
         if not os.path.exists(working_dir):
             os.mkdir(working_dir)
             os.mkdir(tmp_dir)
