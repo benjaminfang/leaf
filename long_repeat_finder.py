@@ -7,7 +7,7 @@ import argparse
 import multiprocessing as mp
 import math
 import statistics
-from biolib import Fasta_parser
+from biolib import Fasta_parser, biocodon
 
 
 def get_args(args_list):
@@ -31,6 +31,370 @@ def get_args(args_list):
     if threads == None:
         threads = round(os.cpu_count() * 0.6)
     return directory, file_list, seed_length, identity_cutoff, coverage_cutoff, expand_len, threads
+
+
+class Seed:
+    def __init__(self, sequence):
+        self.sequence = sequence
+        self.sequence_len = len(self.sequence)
+        self.seed_pointer = 1
+        self.seed_island = [[1, self.sequence_len]]
+
+    def trim_seed_island(self, black_block):
+        #black_block is a list[start, end], which will be trimed form seed isoland.
+        block_start = black_block[0]
+        block_end = black_block[1]
+        updated_seed_island = []
+        for island in self.seed_island:
+            island_start = island[0]
+            island_end = island[1]
+            if block_end < island_start or block_start > island_end:
+                updated_seed_island.append(island)
+            elif block_start <= island_start and block_end >= island_end:
+                pass
+            elif block_start <= island_start and block_end >= island_start:
+                updated_seed_island.append([block_end + 1, island_end])
+            elif block_start <= island_end and block_end => island_end:
+                updated_seed_island.append([island_start, block_start - 1])
+            elif block_start > island_start and block_end < island_end:
+                updated_seed_island.append([island_start, block_start - 1])
+                updated_seed_island.append([block_end + 1, island_end])
+            else:
+                raise Exception(black_block, island)
+        self.seed_island = updated_seed_island
+
+
+    def whether_seed_on_island(self, seed_pos):
+        #seed_pos: [seed_start, seed_end]
+        seed_start = seed_pos[0]
+        seed_end = seed_pos[1]
+        for island in self.seed_island:
+            if island[0] <= seed_start and island[1] >= seed_end:
+                return True
+        return False
+
+    def next_seed(self, seed_length):
+        while True:
+            seed_start = self.seed_pointer
+            seed_end = seed_start + seed_length - 1
+            if seed_end > self.sequence_len:
+                return None
+            if self.whether_seed_on_island([seed_start, seed_end]):
+                self.seed_pointer = seed_end + 1
+                break
+            else:
+                self.seed_pointer = seed_end + 1
+        return [self.sequence[seed_start - 1: seed_end], [seed_start, seed_end]]
+
+
+def makeblastdb(file_name, dbname, directory):
+    cmdname = 'makeblastdb'
+    opt_dbtype = '-dbtype nucl'
+    opt_in = '-in ' + file_name
+    out_path = os.path.join(directory, dbname)
+    opt_out = '-out ' + out_path
+    cmd = ' '.join([cmdname, opt_dbtype, opt_in, opt_out, '&>/dev/null'])
+    os.system(cmd)
+    return out_path
+
+
+def save_seq_as_fasta(seq, file_name, head_name, directory):
+    f_path = os.path.join(directory, file_name)
+    f_out = open(f_path, 'w')
+    f_out.write('>' + head_name + '\n')
+    f_out.write(seq + '\n')
+    f_out.close()
+    return f_path
+
+
+def runblast(item_file, task, db_path, directory, out_f):
+    cmdname = 'blastn'
+    opt_task = '-task ' + task
+    opt_query = '-query ' + item_file
+    opt_db = '-db ' + db_path
+    blast_res = os.path.join(directory, out_f)
+    opt_out = '-out ' + blast_res
+    opt_outfmt = '-outfmt ' + '7'
+    cmd = ' '.join([cmdname, opt_query, opt_db, opt_out, opt_outfmt, opt_task, '&>/dev/null'])
+    os.system(cmd)
+    return blast_res
+
+
+def structure_blast_res(query_seq_length, blast_result_file):
+    # this function is used to structure blast result in format 7.
+    dt_out = []
+    a_lines = [line.rstrip().split() for line in open(blast_result_file) if line[0] != '#']
+    for line in a_lines:
+        identity = round(float(line[2])/100, 5)
+        q_s = int(line[6])
+        q_e = int(line[7])
+        s_s = int(line[8])
+        s_e = int(line[9])
+        if s_s <= s_e:
+            origntation = '+'
+        else:
+            origntation = '-'
+            s_s, s_e = s_e, s_s
+        up_margine = q_s - 1
+        down_margine = query_seq_length - q_e
+        coverage = round((q_e - q_s + 1)/query_seq_length, 5)
+        dt_out.append([s_s, s_e, origntation, up_margine, down_margine, coverage, identity])
+    return dt_out
+
+
+def modify_blast_res(seed_blast_res):
+    seed_ori = '+'
+    for ele in seed_blast_res:
+        if ele[2] == '+':
+            ele[0] -= ele[3]
+            ele[1] += ele[4]
+        else:
+            ele[0] -= ele[4]
+            ele[1] += ele[3]
+    seed_blast_res.sort(key = lambda x:x[0])
+    if seed_blast_res[0][2] == '-':
+        seed_ori = '-'
+        for ele in seed_blast_res:
+            if ele[2] == '-':
+                ele[2] = '+'
+            else:
+                ele[2] = '-'
+    return seed_blast_res, seed_ori
+
+
+def modify_blast_res_s(seed_blast_res):
+    seed_ori = '+'
+    margine = {'up':[], 'down': []}
+    for ele in seed_blast_res:
+        margine['up'].append(ele[3])
+        margine['down'].append(ele[4])
+    up_margine_max = max(margine['up'])
+    down_margine_max = max(margine['down'])
+    for ele in seed_blast_res:
+        if ele[2] = '+':
+            ele[0] += up_margine_max
+            ele[1] -= down_margine_max
+        else:
+            ele[0] += down_margine_max
+            ele[1] -= up_margine_max
+    seed_blast_res.sort(key = lambda x:x[0])
+    if seed_blast_res[0][2] == '-':
+        seed_ori = '-'
+        for ele in seed_blast_res:
+            if ele[2] == '-':
+                ele[2] = '+'
+            else:
+                ele[2] = '-'
+    return seed_blast_res, seed_ori
+
+
+class Fragment_manager:
+    def __init__(self, fragment_list, whole_seq_length):
+        fragment_list.sort(key = lambda x:x[0])
+        self.fragment = fragment_list
+        self.whole_seq_length = whole_seq_length
+
+    def check_overlap(self):
+        tmp = []
+        i = 0
+        for ele in self.fragment_list:
+            tmp.append([ele[0], i])
+            tmp.append([ele[1], i])
+            i += 1
+        tmp.sort()
+        for i in range(len(tmp))[::2]:
+            if tmp[i][1] != tmp[i+1][1]:
+                return  True
+        return False
+
+
+    def calcu_expand_len(self):
+        tmp = []
+        expand_len_coll = {'up':[], 'down':[]}
+        i = 1
+        for ele in self.fragment_list:
+            if ele[2] == '+':
+                tmp.append([i, ele[0], 'l', 'u'])
+                tmp.append([i, ele[1], 'r', 'd'])
+            else:
+                tmp.append([i, ele[0], 'l', 'd'])
+                tmp.append([i, ele[1], 'r', 'u'])
+        tmp.sort(key=lambda x:x[1])
+        if tmp[0][3] == 'u':
+            expand_len_coll['up'].append(tmp[0][1] - 1)
+        else:
+            expand_len_coll['down'].append(tmp[0][1] - 1)
+        if tmp[-1][3] == 'u':
+            expand_len_coll['up'].append(self.whole_seq_length - tmp[-1][1])
+        else:
+            expand_len_coll['down'].append(self.whole_seq_length - tmp[-1][1])
+        tmp = tmp[1:-1]
+        for i in range(len(tmp))[::2]:
+            dis = tmp[i+1][1] - tmp[i][1]
+            if tmp[i][3] != tmp[i+1][3]:
+                expand_len_coll['up'].append(dis)
+                expand_len_coll['down'].append(dis)
+            else:
+                if tmp[i][3] == 'u':
+                    expand_len_coll['up'].append(dis//2)
+                else:
+                    expand_len_coll['down'].append(dis//2)
+        expand_len_coll['up'].sort()
+        expand_len_coll['down'].sort()
+        return {'up': expand_len_coll['up'][0], 'down': expand_len_coll['down'][0]}
+
+
+    def expand_fragment(self, side, length):
+        expand_len = self.calcu_expand_len()
+        up_expansable_len = expand_len['up']
+        down_expansable_len = expand_len['down']
+        up_expand = None
+        down_expand = None
+        if side == 'up':
+            up_expand = min(up_expansable_len, length)
+            for ele in self.fragment_list:
+                if ele[2] == '+':
+                    ele[0] -= up_expand
+                else:
+                    ele[1] += up_expand
+        else:
+            down_expand = min(down_expansable_len, length)
+            for ele in self.fragment_list:
+                if ele[2] == '+':
+                    ele[1] += down_expand
+                else:
+                    ele[0] -= down_expand
+        return self.fragment_list, up_expand or down_expand
+
+
+def provide_init_seed_match_list(sequence, blastdb_path, seed_length, seed_identity_cutoff, seed_coverage_cutoff, directory):
+    seed_instance = Seed(sequence)
+    while True:
+        seed = seed_instance.next(seed_length)
+        #seed: [seed_sequence, [seed_start, seed_end]]
+        if not seed:
+            break
+        seed_sequence_fasta_file = save_seq_as_fasta(seed[0], 'seed_sequence.fasta', 'seed_sequence', directory)
+        seed_blast_res = runblast(seed_sequence_fasta_file, 'blastn-short', blastdb, directory, 'seed_blast_res')
+        blast_res = structure_blast_res(seed_length, seed_blast_res)
+        blast_res, seed_ori = modify_blast_res(blast_res)
+        init_seed_match_list = []
+        for ele in blast_res:
+            if ele[5] >= coverage_cutoff and ele[6] >= identity_cutoff:
+                init_seed_match_list.append(ele)
+        framgment_manger_instance = Fragment_manager([ele[:3] for ele in init_seed_match_list])
+        if not framgment_manger_instance.check_overlap():
+            yield framgment_manger_instance, seed_ori
+
+
+def get_seq(piece, sequence):
+    if piece[2] == '+':
+        return sequence[piece[0]-1, piece[1]]
+    else:
+        seq = [biocodon.base_complement[ele] for ele in sequence[piece[0]-1: piece[1]]]
+        seq.reverse()
+        return ''.join(seq)
+
+
+def run_water(first_file, second_file, directory):
+    #using local alignment method.
+    cmd_name = 'water'
+    opt_gapopen = '10'
+    opt_gapextend = '0.5'
+    opt_outfile = os.path.join(directory, 'needle.res')
+    cmd = ' '.join([cmd_name, '-gapopen', opt_gapopen, '-gapextend', 'opt_gapextend', '-outfile', opt_outfile, first_file, second_file])
+    os.system(cmd)
+    return opt_outfile
+
+
+def struc_water_res(water_file):
+    a_lines = []
+    f_in = open(water_file)
+    for line in f_in:
+        line = line.rstrip()
+        if len(line) > 0 and line[0] != '#':
+            a_lines.append(line)
+    first_seq_ali = []
+    second__seq_ali = []
+    for i in range(len(a_lines))[::3]:
+        first_seq_ali.append(a_lines[i])
+        second__seq_ali.append(a_lines[i+2])
+    first_line = ' '.join(first_seq_ali).split()
+    second_line = ' '.join(second__seq_ali).split()
+    first_seq_start, first_seq_end = int(first_line[1]), int(first_line[-1])
+    second_seq_start, second_seq_end = int(second_line[1]), int(second_line[-1])
+    return [[first_seq_start, first_seq_end], [second_seq_start, second_seq_end]]
+
+
+def calcu_margin_and_lock_boundary(fragment_list, water_res, side):
+    margin_lock = 25
+    tmp = []
+    if side == 'up':
+        for i in range(len(water_res)):
+            tmp.append(water_res[i][0][0] - 1)
+            tmp.append(water_res[i][1][0] - 1)
+    else:
+        for i in range(len(water_res)):
+            tmp.append(framgment_list[0][1] - framgment_list[0][0] +1 - water_res[i][0][1])
+            tmp.append(fragment_list[i+1][1] - framgment_list[i+1][0] + 1 - water_res[i][1][1])
+
+    return 0
+
+
+def thread_worker(args_in):
+    file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock = args_in
+    os.mkdir(sub_tmp_dir)
+    data = {}
+    file_basename = os.path.basename(file_name)
+    data_print['file_name'] = file_basename
+    data_print['head'] = {}
+    fasta_dt = Fasta_parser(file_name)
+    fasta_dt.join_lines()
+    for head in fasta_dt.data:
+        head_name = head.split()[0]
+        data_print['head'][head_name] = []
+        item_sequence = fasta_dt.data[head]
+        whole_seq_length = len(item_sequence)
+        sequence_file = save_seq_as_fasta(item_sequence, 'item_sequence.fasta', sub_tmp_dir)
+        blastdb = makeblastdb(sequence_file, 'blastdb', sub_tmp_dir)
+        init_seed = provide_init_seed_match_list(item_sequence, blastdb, seed_length, identity_cutoff, coverage_cutoff, sub_tmp_dir)
+        for seed_list, seed_ori in init_seed:
+            if seed_ori == '+':
+                fragment_ins, expand_len_act = seed_list.expand_fragment('up', seed_length)
+                first_piece = fragment_ins.fragment[0]
+                first_piece_seq = get_seq(first_piece, item_sequence)
+                first_file = save_seq_as_fasta(first_peice_seq, 'first_file_water.fasta', 'first_seq', sub_tmp_dir)
+                water_compare_res = []
+                for piece in fragment_ins.fragment[1:]:
+                    piece_seq = get_seq(piece, item_sequence)
+                    second_file = save_seq_as_fasta(piece_seq, 'second_file_water.fasta', 'second__seq', sub_tmp_dir)
+                    water_res = run_water(first_file, second__file, sub_tmp_dir)
+                    water_res = struc_water_res(water_res)
+                    water_compare_res.append(water_res)
+                fragment_list_up_locked = calcu_margin_and_lock_boundary(fragment_ins, water_compare_res, 'up')
+                while True:
+                    water_compare_res = []
+                    fragment_ins, expand_len_act = fragment_list_up_locked.expand_fragment('down', expand_length)
+                    first_seq = get_seq(fragment_ins.fragment[0])
+                    first_piece_seq = get_seq(first_piece, item_sequence)
+                    first_file = save_seq_as_fasta(first_piece_seq, 'first_file_water.fasta', 'first_seq', sub_tmp_dir)
+                    for piece in fragment_ins.fragment:
+                        piece_seq = get_seq(piece, item_sequence)
+                        socond_file = save_seq_as_fasta(piece_seq, 'second__file_water.fasta', 'second_seq', sub_tmp_dir)
+                        water_res = run_water(first_file, second__file, sub_tmp_dir)
+                        water_res = struc_water_res(water_res)
+                        water_compare_res.append(water_res)
+
+                    if expand_len_act < expand_length:
+                        break
+            else:
+                pass
+
+
+
+
+
+    return 0
 
 
 class Seed_provider:
@@ -103,72 +467,6 @@ class Seed_provider:
             else:
                 self.trim_seed_island(seed_start, seed_end)
                 self.seed_pointer += seed_length
-
-
-def save_seq_as_fasta(seq, file_name, directory):
-    f_path = os.path.join(directory, file_name)
-    f_out = open(f_path, 'w')
-    f_out.write('>seq_in_fasta\n')
-    f_out.write(seq + '\n')
-    f_out.close()
-    return f_path
-
-
-def makeblastdb(file_name, dbname, directory):
-    cmdname = 'makeblastdb'
-    opt_dbtype = '-dbtype nucl'
-    opt_in = '-in ' + file_name
-    out_path = os.path.join(directory, dbname)
-    opt_out = '-out ' + out_path
-    cmd = ' '.join([cmdname, opt_dbtype, opt_in, opt_out, '&>/dev/null'])
-    os.system(cmd)
-    return out_path
-
-
-def runblast(item_file, task, db_path, directory, out_f):
-    cmdname = 'blastn'
-    opt_task = '-task ' + task
-    opt_query = '-query ' + item_file
-    opt_db = '-db ' + db_path
-    blast_res = os.path.join(directory, out_f)
-    opt_out = '-out ' + blast_res
-    opt_outfmt = '-outfmt ' + '7'
-    cmd = ' '.join([cmdname, opt_query, opt_db, opt_out, opt_outfmt, opt_task, '&>/dev/null'])
-    os.system(cmd)
-    return blast_res
-
-
-def structure_blast_res(query_seq_length, blast_result_file):
-    # this function is used to structure blast result in format 7.
-    dt_out = []
-    a_lines = [line.rstrip().split() for line in open(blast_result_file) if line[0] != '#']
-    for line in a_lines:
-        identity = round(float(line[2])/100, 5)
-        q_s = int(line[6])
-        q_e = int(line[7])
-        s_s = int(line[8])
-        s_e = int(line[9])
-        if s_s <= s_e:
-            origntation = '+'
-        else:
-            origntation = '-'
-            s_s, s_e = s_e, s_s
-        up_margine = q_s - 1
-        down_margine = query_seq_length - q_e
-        coverage = round((q_e - q_s + 1)/query_seq_length, 5)
-        dt_out.append([s_s, s_e, origntation, up_margine, down_margine, coverage, identity])
-    return dt_out
-
-
-def modify_seed(seed_blast_res):
-    for ele in seed_blast_res:
-        if ele[2] == '+':
-            ele[0] -= ele[3]
-            ele[1] += ele[4]
-        else:
-            ele[0] -= ele[4]
-            ele[1] += ele[3]
-    return seed_blast_res
 
 
 def judge_seed(seed_item, blast_res_structed, coverage_cutoff, identity_cutoff):
