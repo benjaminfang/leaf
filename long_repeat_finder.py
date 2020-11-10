@@ -501,8 +501,8 @@ def transite_location(frag, boundarys, side):
 
 
 def thread_worker(args_in):
-    print(args_in)
-    file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, f_all_repeat, lock = args_in
+    file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, repeat_result_file, lock = args_in
+    sub_tmp_dir = os.path.join(sub_tmp_dir, os.path.basename(file_name))
     if not os.path.exists(sub_tmp_dir):
         os.mkdir(sub_tmp_dir)
     data = {}
@@ -522,9 +522,8 @@ def thread_worker(args_in):
         seed = Seed(item_sequence)
         fragment_res = provide_init_seed_match_list(seed, blastdb, seed_length, identity_cutoff, coverage_cutoff, sub_tmp_dir, whole_seq_length)
         for frag in fragment_res:
-            print(frag.fragment)
+            print('>init_seed_list', frag.fragment)
             fragment_ins, expand_len_act = frag.expand_fragment('up', seed_length)
-            print(fragment_ins.fragment, expand_len_act, fragment_ins.seed_index)
             fragment_ins.lock_up()
             seed_frag = fragment_ins.fragment[fragment_ins.seed_index]
             seed_frag_seq = get_seq(seed_frag, item_sequence)
@@ -536,16 +535,13 @@ def thread_worker(args_in):
                 water_res = run_water(seed_frag_file, second_file, sub_tmp_dir)
                 water_res = struc_water_res(water_res)
                 water_compare_res.append(water_res)
-            print(water_compare_res)
             boundarys = detect_boundary(fragment_ins, water_compare_res, 'up', expand_len_act)
-            print(boundarys)
             transite_location(fragment_ins, boundarys, 'up')
             print(fragment_ins.fragment)
             while True:
                 if fragment_ins.down_lock:
                     break
                 fragment_ins, expand_len_act = fragment_ins.expand_fragment('down', expand_length)
-                print(fragment_ins.fragment, expand_len_act)
                 if expand_len_act < expand_length:
                     fragment_ins.lock_down()
                 seed_frag = fragment_ins.fragment[fragment_ins.seed_index]
@@ -558,26 +554,25 @@ def thread_worker(args_in):
                     water_res = run_water(seed_frag_file, second_file, sub_tmp_dir)
                     water_res = struc_water_res(water_res)
                     water_compare_res.append(water_res)
-                print(water_compare_res)
                 boundarys = detect_boundary(fragment_ins, water_compare_res, 'down', expand_len_act)
-                print(boundarys)
                 if whether_lock(fragment_ins, boundarys, lock_base_cutoff):
                     fragment_ins.lock_down()
                 transite_location(fragment_ins, boundarys, 'down')
-                print(fragment_ins.fragment)
+            print(fragment_ins.fragment)
             for ele in fragment_ins.fragment:
                 seed.trim_seed_island([ele[0], ele[1]])
             data['head'][head_name].append(fragment_ins)
+
+    f_out = open(repeat_result_file)
+    lock.acquire()
+    print('>' + data['file_name'], file=f_out)
+    for cont in data['head']:
+        print('>>' + cont, file=f_out)
+        for ele in data['head'][cont]:
+            print(ele.fragment, file=f_out)
+    lock.release()
+    f_out.close()
     return 0
-
-
-def test():
-    file_test = sys.argv[1]
-    thread_worker([file_test, 200, 0.9, 0.9, 100, 'test_dir', 'res_test.fasta', 'lock'])
-    return 0
-
-
-test()
 
 
 def main(name='long_repeat_finder', args=None):
@@ -586,7 +581,7 @@ def main(name='long_repeat_finder', args=None):
         directory, file_list, seed_length, coverage_cutoff, identity_cutoff, expand_length, threads = get_args(args)
         working_dir = 'working_dir_' + time.strftime('%Y%m%d%H%M%S')
         tmp_dir = os.path.join(working_dir, 'tmp')
-        f_all_repeat = os.path.join(working_dir, 'repeats_result.fasta')
+        repeat_result_file = os.path.join(working_dir, 'repeats_result.fasta')
         if not os.path.exists(working_dir):
             os.mkdir(working_dir)
             os.mkdir(tmp_dir)
@@ -597,16 +592,13 @@ def main(name='long_repeat_finder', args=None):
 
         lock = mp.Manager().Lock()
         args_list = []
-        i = 0
         for file_name in item_file:
             args_list.append([file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length,
-                os.path.join(tmp_dir, 'tmp_' + str(i)), f_all_repeat, lock])
-            i += 1
+                tmp_dir, repeat_result_file, lock])
         pool = mp.Pool(threads)
-        pool.map(worker_func, args_list)
+        pool.map(thread_worker, args_list)
     return 0
 
 
 if __name__ == '__main__':
-    pass
-    # main()
+    main()
