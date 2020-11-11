@@ -410,10 +410,13 @@ def detect_boundary(frag, water_res, side, expand_len_act):
                 if score_lose > score:
                     break
             while True:
-                if mid_seq[i - 1] == '.' or mid_seq[i - 1] == ' ':
-                    i -= 1
-                else:
-                    break
+                try:
+                    if mid_seq[i - 1] == '.' or mid_seq[i - 1] == ' ':
+                        i -= 1
+                    else:
+                        break
+                except Exception('debug') as ex:
+                    print('>>>>', i, len(mid_seq), ex)
             for ele in first_seq[i:]:
                 if ele != '-':
                     first_pos[1] -= 1
@@ -446,8 +449,8 @@ def detect_boundary(frag, water_res, side, expand_len_act):
         else:
             back_num = expand_len_act - (second_frag_len - second_pos[1])
             expand_start = locat_expand_start(second_seq, 'down', back_num)
-            water_res_expand = {'first_seq': first_seq[expand_start:], 'first_pos': [first_pos[1] - back_num, first_pos[1]],
-                'second_seq': second_seq[expand_start:], 'second_pos': [second_pos[1] - back_num, second_pos[1]],
+            water_res_expand = {'first_seq': first_seq[expand_start:], 'first_pos': [first_pos[1] - back_num + 1, first_pos[1]],
+                'second_seq': second_seq[expand_start:], 'second_pos': [second_pos[1] - back_num + 1, second_pos[1]],
                 'mid_seq': mid_seq[expand_start:]}
             # DEBUG: print(water_res_expand)
             detected_boundary = detect_boundary(water_res_expand, 'down', score)
