@@ -1,7 +1,6 @@
 #! /usr/bin/env python3
 
 import os
-import sys
 import time
 import argparse
 import multiprocessing as mp
@@ -522,7 +521,6 @@ def thread_worker(args_in):
         seed = Seed(item_sequence)
         fragment_res = provide_init_seed_match_list(seed, blastdb, seed_length, identity_cutoff, coverage_cutoff, sub_tmp_dir, whole_seq_length)
         for frag in fragment_res:
-            print('>init_seed_list', frag.fragment)
             fragment_ins, expand_len_act = frag.expand_fragment('up', seed_length)
             fragment_ins.lock_up()
             seed_frag = fragment_ins.fragment[fragment_ins.seed_index]
@@ -537,7 +535,6 @@ def thread_worker(args_in):
                 water_compare_res.append(water_res)
             boundarys = detect_boundary(fragment_ins, water_compare_res, 'up', expand_len_act)
             transite_location(fragment_ins, boundarys, 'up')
-            print(fragment_ins.fragment)
             while True:
                 if fragment_ins.down_lock:
                     break
@@ -558,20 +555,18 @@ def thread_worker(args_in):
                 if whether_lock(fragment_ins, boundarys, lock_base_cutoff):
                     fragment_ins.lock_down()
                 transite_location(fragment_ins, boundarys, 'down')
-            print(fragment_ins.fragment)
             for ele in fragment_ins.fragment:
                 seed.trim_seed_island([ele[0], ele[1]])
             data['head'][head_name].append(fragment_ins)
-
-    f_out = open(repeat_result_file)
     lock.acquire()
+    f_out = open(repeat_result_file, 'a')
     print('>' + data['file_name'], file=f_out)
     for cont in data['head']:
         print('>>' + cont, file=f_out)
         for ele in data['head'][cont]:
             print(ele.fragment, file=f_out)
-    lock.release()
     f_out.close()
+    lock.release()
     return 0
 
 
