@@ -335,19 +335,19 @@ def detect_boundary(frag, water_res, side, expand_len_act):
         i = 0
         if side == 'up':
             for ele in seq:
+                if back_num == 0:
+                    break
                 if ele != '-':
                     back_num -= 1
                 i += 1
-                if back_num == 0:
-                    break
         else:
             for ele in seq[::-1]:
+                if back_num == 0:
+                    i = len(seq - i)
+                    break
                 if ele != '-':
                     back_num -= 1
                 i += 1
-                if back_num == 0:
-                    i = len(seq) - i
-                    break
         return i
 
     def detect_boundary(water_expand_seq, side, score=15):
@@ -410,13 +410,10 @@ def detect_boundary(frag, water_res, side, expand_len_act):
                 if score_lose > score:
                     break
             while True:
-                try:
-                    if mid_seq[i - 1] == '.' or mid_seq[i - 1] == ' ':
-                        i -= 1
-                    else:
-                        break
-                except Exception:
-                    print('>>>>', i, len(mid_seq))
+                if mid_seq[i - 1] == '.' or mid_seq[i - 1] == ' ':
+                    i -= 1
+                else:
+                    break
             for ele in first_seq[i:]:
                 if ele != '-':
                     first_pos[1] -= 1
@@ -448,11 +445,13 @@ def detect_boundary(frag, water_res, side, expand_len_act):
             data_out.append([first_boundary, second_boundary])
         else:
             back_num = expand_len_act - (second_frag_len - second_pos[1])
+            print('back_num', back_num)
             expand_start = locat_expand_start(second_seq, 'down', back_num)
             water_res_expand = {'first_seq': first_seq[expand_start:], 'first_pos': [first_pos[1] - back_num + 1, first_pos[1]],
                 'second_seq': second_seq[expand_start:], 'second_pos': [second_pos[1] - back_num + 1, second_pos[1]],
                 'mid_seq': mid_seq[expand_start:]}
             # DEBUG: print(water_res_expand)
+            print('water_res_expand', water_res_expand)
             detected_boundary = detect_boundary(water_res_expand, 'down', score)
             first_boundary = [first_pos[0], detected_boundary['first_pos'][1]]
             second_boundary = [second_pos[0], detected_boundary['second_pos'][1]]
