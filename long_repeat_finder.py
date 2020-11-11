@@ -319,7 +319,7 @@ def struc_water_res(water_file):
         first = ele[0].split()
         dt['first_pos'].append([int(first[1]), int(first[-1])])
         dt['first_seq'] += first[2]
-        # note not same mid sequence length actually.
+        # NOTE: note not same mid sequence length actually.
         mid = ele[1][21: 71]
         dt['mid_seq'] += mid
         second = ele[2].split()
@@ -457,7 +457,7 @@ def detect_boundary(frag, water_res, side, expand_len_act):
     return data_out
 
 
-def whether_lock(frag, boundarys, lock_base_cutoff):
+def whether_lock_down(frag, boundarys, lock_base_cutoff):
     # only judge down side lock_down bool.
     i = 0
     tmp = []
@@ -499,6 +499,20 @@ def transite_location(frag, boundarys, side):
     return 0
 
 
+def align_fragment_water(frag, directory, item_sequence):
+    dt_out = []
+    seed_frag = frag.fragment[frag.seed_index]
+    seed_frag_seq = get_seq(seed_frag, item_sequence)
+    seed_frag_file = save_seq_as_fasta(seed_frag_seq, 'seed_frag_seq_water.fasta', 'seed_frag_seq', directory)
+    for piece in frag.fragment:
+        piece_seq = get_seq(piece, item_sequence)
+        second_file = save_seq_as_fasta(piece_seq, 'second_file_water.fasta', 'second_seq', directory)
+        water_res = run_water(seed_frag_file, second_file, directory)
+        water_res = struc_water_res(water_res)
+        dt_out.append(water_res)
+    return dt_out
+
+
 def thread_worker(args_in):
     file_name, seed_length, coverage_cutoff, identity_cutoff, expand_length, sub_tmp_dir, repeat_result_file, lock = args_in
     sub_tmp_dir = os.path.join(sub_tmp_dir, os.path.basename(file_name))
@@ -514,25 +528,20 @@ def thread_worker(args_in):
     for head in fasta_dt.data:
         head_name = head.split()[0]
         data['head'][head_name] = []
+        # NOTE: save item sequence to a file and make blast datebase.
         item_sequence = fasta_dt.data[head]
         whole_seq_length = len(item_sequence)
         sequence_file = save_seq_as_fasta(item_sequence, 'item_sequence.fasta', 'whole_sequecne', sub_tmp_dir)
         blastdb = makeblastdb(sequence_file, 'blastdb', sub_tmp_dir)
+        # NOTE: construct Seed class instance
         seed = Seed(item_sequence)
+        # NOTE: fragment_res is iterable, and yeild by provide_init_seed_match_list function.
         fragment_res = provide_init_seed_match_list(seed, blastdb, seed_length, identity_cutoff, coverage_cutoff, sub_tmp_dir, whole_seq_length)
         for frag in fragment_res:
+            # NOTE: First exapnd up side by length of seed and lock up side.
             fragment_ins, expand_len_act = frag.expand_fragment('up', seed_length)
             fragment_ins.lock_up()
-            seed_frag = fragment_ins.fragment[fragment_ins.seed_index]
-            seed_frag_seq = get_seq(seed_frag, item_sequence)
-            seed_frag_file = save_seq_as_fasta(seed_frag_seq, 'seed_frag_seq_water.fasta', 'seed_frag_seq', sub_tmp_dir)
-            water_compare_res = []
-            for piece in fragment_ins.fragment:
-                piece_seq = get_seq(piece, item_sequence)
-                second_file = save_seq_as_fasta(piece_seq, 'second_file_water.fasta', 'second_seq', sub_tmp_dir)
-                water_res = run_water(seed_frag_file, second_file, sub_tmp_dir)
-                water_res = struc_water_res(water_res)
-                water_compare_res.append(water_res)
+            water_compare_res = align_fragment_water(fragment_ins, sub_tmp_dir, item_sequence)
             boundarys = detect_boundary(fragment_ins, water_compare_res, 'up', expand_len_act)
             transite_location(fragment_ins, boundarys, 'up')
             while True:
@@ -541,18 +550,9 @@ def thread_worker(args_in):
                 fragment_ins, expand_len_act = fragment_ins.expand_fragment('down', expand_length)
                 if expand_len_act < expand_length:
                     fragment_ins.lock_down()
-                seed_frag = fragment_ins.fragment[fragment_ins.seed_index]
-                seed_frag_seq = get_seq(seed_frag, item_sequence)
-                seed_frag_file = save_seq_as_fasta(seed_frag_seq, 'seed_frag_seq_water.fasta', 'seed_frag_seq', sub_tmp_dir)
-                water_compare_res = []
-                for piece in fragment_ins.fragment:
-                    piece_seq = get_seq(piece, item_sequence)
-                    second_file = save_seq_as_fasta(piece_seq, 'second_file_water.fasta', 'second_seq', sub_tmp_dir)
-                    water_res = run_water(seed_frag_file, second_file, sub_tmp_dir)
-                    water_res = struc_water_res(water_res)
-                    water_compare_res.append(water_res)
+                water_compare_res = align_fragment_water(fragment_ins, sub_tmp_dir, item_sequence)
                 boundarys = detect_boundary(fragment_ins, water_compare_res, 'down', expand_len_act)
-                if whether_lock(fragment_ins, boundarys, lock_base_cutoff):
+                if whether_lock_down(fragment_ins, boundarys, lock_base_cutoff):
                     fragment_ins.lock_down()
                 transite_location(fragment_ins, boundarys, 'down')
             for ele in fragment_ins.fragment:
@@ -595,5 +595,15 @@ def main(name='long_repeat_finder', args=None):
     return 0
 
 
+def test_thread_worker(args):
+    thread_worker(args)
+    return 0
+
+
 if __name__ == '__main__':
-    main()
+    import sys
+    if len(sys.argv) == 3 and sys.argv[1] == 'test':
+        os.mkdir('tmp_test')
+        test_thread_worker([sys.argv[2], 200, 0.9, 0.9, 100, 'tmp_test', 'test_res', 'lock'])
+    else:
+        main()
