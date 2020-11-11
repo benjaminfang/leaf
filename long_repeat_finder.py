@@ -227,7 +227,7 @@ class Fragment_manager:
             expand_len_coll['down'].append(self.whole_seq_length - tmp[-1][1])
         tmp = tmp[1:-1]
         for i in range(len(tmp))[::2]:
-            dis = tmp[i + 1][1] - tmp[i][1]
+            dis = tmp[i + 1][1] - tmp[i][1] - 1
             if tmp[i][3] != tmp[i + 1][3]:
                 expand_len_coll['up'].append(dis)
                 expand_len_coll['down'].append(dis)
@@ -244,23 +244,22 @@ class Fragment_manager:
         expand_len = self.calcu_expand_len()
         up_expansable_len = expand_len['up']
         down_expansable_len = expand_len['down']
-        up_expand = None
-        down_expand = None
+        actually_exapnd_len = None
         if side == 'up':
-            up_expand = min(up_expansable_len, length)
+            actually_exapnd_len = min(up_expansable_len, length)
             for ele in self.fragment:
                 if ele[2] == '+':
-                    ele[0] -= up_expand
+                    ele[0] -= actually_exapnd_len
                 else:
-                    ele[1] += up_expand
+                    ele[1] += actually_exapnd_len
         else:
-            down_expand = min(down_expansable_len, length)
+            actually_exapnd_len = min(down_expansable_len, length)
             for ele in self.fragment:
                 if ele[2] == '+':
-                    ele[1] += down_expand
+                    ele[1] += actually_exapnd_len
                 else:
-                    ele[0] -= down_expand
-        return self, up_expand or down_expand
+                    ele[0] -= actually_exapnd_len
+        return self, actually_exapnd_len
 
 
 def provide_init_seed_match_list(seed, blastdb_path, seed_length, seed_identity_cutoff, seed_coverage_cutoff, directory, whole_seq_length):
@@ -276,11 +275,12 @@ def provide_init_seed_match_list(seed, blastdb_path, seed_length, seed_identity_
         for ele in blast_res:
             if ele[5] >= seed_coverage_cutoff and ele[6] >= seed_identity_cutoff:
                 init_seed_match_list.append(ele)
-        if len(init_seed_match_list) > 2:
+        if len(init_seed_match_list) >= 2:
             blast_res, seed_index = modify_blast_res_s(init_seed_match_list, seed)
             framgment_manger_instance = Fragment_manager([ele[:3] for ele in init_seed_match_list], whole_seq_length, seed_index, seed)
             if not framgment_manger_instance.check_overlap():
                 yield framgment_manger_instance
+    return 0
 
 
 def get_seq(piece, sequence):
