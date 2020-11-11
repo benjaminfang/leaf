@@ -343,7 +343,7 @@ def detect_boundary(frag, water_res, side, expand_len_act):
         else:
             for ele in seq[::-1]:
                 if back_num == 0:
-                    i = len(seq - i)
+                    i = len(seq) - i
                     break
                 if ele != '-':
                     back_num -= 1
