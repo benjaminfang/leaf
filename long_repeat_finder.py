@@ -466,8 +466,9 @@ def whether_lock_down(frag, boundarys, lock_base_cutoff):
     i = 0
     seed_frag_len = frag.fragment[frag.seed_index][1] - frag.fragment[frag.seed_index][0] + 1
     for ele in boundarys:
-        tmp.append(seed_frag_len - ele[0][1])
-        tmp.append(frag.fragment[i][1] - frag.fragment[i][0] + 1 - ele[1][1])
+        first_gap = seed_frag_len - ele[0][1]
+        second_gap = frag.fragment[i][1] - frag.fragment[i][0] + 1 - ele[1][1]
+        tmp.append(min(first_gap, second_gap))
         i += 1
     dis_max = max(tmp)
     if dis_max > lock_base_cutoff:
@@ -570,8 +571,8 @@ def thread_worker(args_in):
                 print('l3 boundarys', boundarys)
                 if whether_lock_down(fragment_ins, boundarys, lock_base_cutoff):
                     fragment_ins.lock_down()
-                transite_location(fragment_ins, boundarys, 'down')
-                print('l4 transieted positon:', fragment_ins.fragment)
+            transite_location(fragment_ins, boundarys, 'down')
+            print('6 transieted positon:', fragment_ins.fragment)
             for ele in fragment_ins.fragment:
                 seed.trim_seed_island([ele[0], ele[1]])
             data['head'][head_name].append(fragment_ins)
