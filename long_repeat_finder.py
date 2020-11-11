@@ -330,7 +330,7 @@ def struc_water_res(water_file):
     return dt
 
 
-def detect_boundary(frag, water_res, side, expand_len_act):
+def detect_boundary(frag, water_res, side, expand_len_act, score=15):
     def locat_expand_start(first_seq, second_seq, side, indent_length):
         indent_str_len = 0
         first_base_len = indent_length
@@ -429,7 +429,6 @@ def detect_boundary(frag, water_res, side, expand_len_act):
             return {'first_pos': first_pos, 'second_pos': second_pos}
 
     data_out = []
-    score = 15
     first_frag_len = frag.fragment[frag.seed_index][1] - frag.fragment[frag.seed_index][0] + 1
     for water_ele in water_res:
         first_seq = water_ele['first_seq']
@@ -478,30 +477,39 @@ def whether_lock_down(frag, boundarys, lock_base_cutoff):
 
 
 def transite_location(frag, boundarys, side):
-    tmp = []
+    first_tmp = []
+    second_tmp = []
     if side == 'up':
         for ele in boundarys:
-            tmp.append(ele[0][0])
-            tmp.append(ele[1][0])
-        goback = max(tmp) - 1
+            first_tmp.append(ele[0][0] - 1)
+            second_tmp.append(ele[1][0] - 1)
+        first_tmp = first_tmp[: frag.seed_index] + first_tmp[frag.seed_index + 1:]
+        seed_subtract = min(first_tmp)
+        second_tmp = second_tmp[: frag.seed_index] + [seed_subtract] + second_tmp[frag.seed_index + 1:]
+        i = 0
         for ele in frag.fragment:
             if ele[2] == '+':
-                ele[0] += goback
+                ele[0] += second_tmp[i]
             else:
-                ele[1] -= goback
+                ele[1] -= second_tmp[i]
+            i += 1
     else:
         i = 0
         seed_frag_len = frag.fragment[frag.seed_index][1] - frag.fragment[frag.seed_index][0] + 1
         for ele in boundarys:
-            tmp.append(seed_frag_len - ele[0][1])
-            tmp.append(frag.fragment[i][1] - frag.fragment[i][0] + 1 - ele[1][1])
+            first_tmp.append(seed_frag_len - ele[0][1])
+            second_tmp.append(frag.fragment[i][1] - frag.fragment[i][0] + 1 - ele[1][1])
             i += 1
-        goback = max(tmp)
+        first_tmp = first_tmp[: frag.seed_index] + first_tmp[frag.seed_index + 1:]
+        seed_subtract = min(first_tmp)
+        second_tmp = second_tmp[: frag.seed_index] + [seed_subtract] + second_tmp[frag.seed_index + 1:]
+        i = 0
         for ele in frag.fragment:
             if ele[2] == '+':
-                ele[1] -= goback
+                ele[1] -= second_tmp[i]
             else:
-                ele[0] += goback
+                ele[0] += second_tmp[i]
+            i += 1
     return 0
 
 
@@ -553,7 +561,7 @@ def thread_worker(args_in):
             fragment_ins.lock_up()
             water_compare_res = align_fragment_water(fragment_ins, sub_tmp_dir, item_sequence)
             print('3 water align res:', water_compare_res)
-            boundarys = detect_boundary(fragment_ins, water_compare_res, 'up', expand_len_act)
+            boundarys = detect_boundary(fragment_ins, water_compare_res, 'up', expand_len_act, 15)
             print('4 up boundarys fixed:', boundarys)
             transite_location(fragment_ins, boundarys, 'up')
             print('5 transite to abs positon:', fragment_ins.fragment)
@@ -567,7 +575,7 @@ def thread_worker(args_in):
                     fragment_ins.lock_down()
                 water_compare_res = align_fragment_water(fragment_ins, sub_tmp_dir, item_sequence)
                 print('l2 water align res:', water_compare_res)
-                boundarys = detect_boundary(fragment_ins, water_compare_res, 'down', expand_len_act)
+                boundarys = detect_boundary(fragment_ins, water_compare_res, 'down', expand_len_act, 15)
                 print('l3 boundarys', boundarys)
                 if whether_lock_down(fragment_ins, boundarys, lock_base_cutoff):
                     fragment_ins.lock_down()
