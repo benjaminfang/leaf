@@ -603,7 +603,8 @@ def test_thread_worker(args):
 if __name__ == '__main__':
     import sys
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
-        os.mkdir('tmp_test')
+        if not os.path.exists('tmp_test'):
+            os.mkdir('tmp_test')
         lock = mp.Manager().Lock()
         test_thread_worker([sys.argv[2], 200, 0.9, 0.9, 100, 'tmp_test', 'test_res', lock])
     else:
