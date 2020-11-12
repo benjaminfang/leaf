@@ -1,10 +1,10 @@
 # leaf
-## Long Repeat Finder 
+*Long Repeat Finder*   
 Find out long repeats along genome.
 
-## Introduction  
-    Find out repeats among genome and group them into repeat group.  
- 
+## Introduction
+Find out repeats among genome and group them into repeat group.  
+
 ## Requirement  
 * [biolib](https://github.com/benjaminfang/biolib)
 * python3  
