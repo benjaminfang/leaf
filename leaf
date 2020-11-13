@@ -626,24 +626,6 @@ def test_thread_worker(args):
     return 0
 
 
-class Block_seq:
-    def __init__(self, fragment):
-        self.starts = None
-        self.offset = None
-        self.region = None
-        self.oritation = None
-        flag = []
-        for frag in fragment:
-            flag.append(frag[0])
-            pass
-        
-
-
-
-class Mother_board(Block_seq):
-    pass
-
-
 if __name__ == '__main__':
     import sys
     if len(sys.argv) == 3 and sys.argv[1] == 'test':
