@@ -640,19 +640,19 @@ class Block:
         else:
             raise Exception('relation not exist.')
 
-        def reset_line(self):
-            self.left_block = []
-            self.left_block_relation = []
-            self.left_block_origin = []
-            self.right_block = []
-            self.right_block_relation = []
-            self.right_block_origin = []
-            self.other_cover_me_block = []
-            self.other_cover_me_block_origin = []
-            self.other_i_cover_block = []
-            self.other_i_cover_block_origin = []
-            self.equal_block = []
-            self.equal_block_origin = []
+    def unset_line(self):
+        self.left_block = []
+        self.left_block_relation = []
+        self.left_block_origin = []
+        self.right_block = []
+        self.right_block_relation = []
+        self.right_block_origin = []
+        self.other_cover_me_block = []
+        self.other_cover_me_block_origin = []
+        self.other_i_cover_block = []
+        self.other_i_cover_block_origin = []
+        self.equal_block = []
+        self.equal_block_origin = []
 
 
 class Block_array(Block):
