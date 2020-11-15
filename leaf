@@ -546,18 +546,21 @@ class Block:
         self.region = block_fragment[0:2]
         self.origntation = block_fragment[2]
         self.slice = []
-        self.left_block = []
-        self.left_block_relation = []
-        self.left_block_origin = []
-        self.right_block = []
-        self.right_block_relation = []
-        self.right_block_origin = []
+        self.left_block = None
+        self.left_block_relation = None
+        self.left_block_origin = None
+        self.right_block = None
+        self.right_block_relation = None
+        self.right_block_origin = None
         self.other_cover_me_block = []
         self.other_cover_me_block_origin = []
         self.other_i_cover_block = []
         self.other_i_cover_block_origin = []
         self.equal_block = []
         self.equal_block_origin = []
+
+    def __next__(self):
+        pass
 
     def region_relation(self, obj_b, join_flap=10, cover_flap=5):
         cover_flap += 1
@@ -570,7 +573,7 @@ class Block:
         A_B_se = A_s - B_e
         A_B_es = A_e - B_s
         A_B_ee = A_e - B_e
-        if A_B_ss < 0:
+        if A_B_ss < -cover_flap:
             if A_B_es < -(join_flap):
                 return 'self_separate_second'
             elif A_B_es >= -(join_flap) and A_B_es <= join_flap:
@@ -580,7 +583,7 @@ class Block:
                     return 'self_overlap_second'
                 else:
                     return 'self_cover_second'
-        elif A_B_ss > 0:
+        elif A_B_ss > cover_flap:
             if A_B_se > join_flap:
                 return 'second_separate_self'
             elif A_B_se <= join_flap and A_B_se >= -(join_flap):
@@ -598,39 +601,39 @@ class Block:
             else:
                 return 'self_equal_second'
 
-    def link(self, other, join_flap):
+    def link(self, other):
         relation = self.region_relation(other, 10, 5)
         if self.array_id == other.array_id:
             origin = 'same'
         else:
             origin = 'diff'
         if relation == 'self_separate_second':
-            self.righ_block.append(other)
-            self.right_block_relation.append('separate')
-            self.right_block_origin.append(origin)
+            self.righ_block = other
+            self.right_block_relation = 'separate'
+            self.right_block_origin = origin
         elif relation == 'self_joined_second':
-            self.righ_block.append(other)
-            self.right_block_relation.append('joined')
-            self.right_block_origin.append(origin)
+            self.righ_block = other
+            self.right_block_relation = 'joined'
+            self.right_block_origin = origin
         elif relation == 'self_overlap_second':
-            self.righ_block.append(other)
-            self.right_block_relation.append('overlap')
-            self.right_block_origin.append(origin)
+            self.righ_block = other
+            self.right_block_relation = 'overlap'
+            self.right_block_origin = origin
         elif relation == 'self_cover_second':
             self.other_i_cover_block.append(other)
             self.other_i_cover_block_origin.append(origin)
         elif relation == 'second_separate_self':
-            self.left_block.append(other)
-            self.left_block_relation.append('separate')
-            self.left_block_origin.append(origin)
+            self.left_block = other
+            self.left_block_relation = 'separate'
+            self.left_block_origin = origin
         elif relation == 'second_joined_self':
-            self.left_block.append(other)
-            self.left_block_relation.append('joined')
-            self.left_block_origin.append(origin)
+            self.left_block = other
+            self.left_block_relation = 'joined'
+            self.left_block_origin = origin
         elif relation == 'second_overlap_self':
-            self.left_block.append(other)
-            self.left_block_relation.append('overlap')
-            self.left_block_origin.append(origin)
+            self.left_block = other
+            self.left_block_relation = 'overlap'
+            self.left_block_origin = origin
         elif relation == 'second_cover_self':
             self.other_cover_me_block.append(other)
             self.other_cover_me_block_origin.append(origin)
@@ -640,13 +643,13 @@ class Block:
         else:
             raise Exception('relation not exist.')
 
-    def unset_line(self):
-        self.left_block = []
-        self.left_block_relation = []
-        self.left_block_origin = []
-        self.right_block = []
-        self.right_block_relation = []
-        self.right_block_origin = []
+    def unlink(self):
+        self.left_block = None
+        self.left_block_relation = None
+        self.left_block_origin = None
+        self.right_block = None
+        self.right_block_relation = None
+        self.right_block_origin = None
         self.other_cover_me_block = []
         self.other_cover_me_block_origin = []
         self.other_i_cover_block = []
@@ -654,35 +657,37 @@ class Block:
         self.equal_block = []
         self.equal_block_origin = []
 
+    def block_nighbors(self):
+        return [[self.left_block, self.left_block_relation, self.left_block_origin],
+            [self.righ_block, self.right_block_relation, self.right_block_origin]]
+
 
 class Block_array(Block):
     def __init__(self, fragments, array_id):
         def init_block_array(fragments, array_id):
             block_id = 1
-            for ele in fragments:
-                block = Block(ele, block_id, array_id)
-                self.block_array.append(block)
-            i = 0
-            for block in self.block_array[:-1]:
-                block.link(self.block_array[i + 1])
-                i += 1
+            first_block = Block(fragments[0], block_id, array_id)
+            dt_out = first_block
+            block_id += 1
+            for ele in fragments[1:]:
+                second_block = Block(ele, block_id, array_id)
+                first_block.link(second_block)
+                first_block = second_block
+                block_id += 1
+            return dt_out
 
         self.array_id = array_id
-        self.block_array = []
+        self.block_array = init_block_array(fragments)
         self.start = fragments[0][0]
-        self.width = fragments[-1][1] - fragments[0][0]
+        self.width = fragments[-1][1] - fragments[0][0] + 1
         self.region = [fragments[0][0], fragments[-1][1]]
 
     def __iter__(self):
-        self.iter_s = 0
-        self.iter_e = len(self.block_array)
-        return self
-
-    def __next__(self):
-        if self.iter_s == self.iter_e:
-            raise StopIteration
-        block = self.block_array[self.iter_s]
-        self.iter_s += 1
+        while True:
+            block = self.block_array
+            left_block = block.left_block
+            if not left_block:
+                break
         return block
 
     def align_block_array(self, other):
@@ -715,11 +720,14 @@ class Block_array(Block):
                 block_relation_seq[0][1].link(block_a)
         return 0
 
+    def link_block_array(self):
+        for block in
+
 
 class Group_manager:
-    def __inti__(self, group_id, fragments):
+    def __inti__(self, group_id, mother_block_array):
         self.group_id = group_id
-        self.mother_block_array = Block_array(fragments, 0)
+        self.mother_block_array = mother_block_array
         self.member_arrays = []
 
     def add_array(self, array):
@@ -734,29 +742,46 @@ def group_repeat(fragments_data):
     # NOTE: fragment_data: {file_name:str, head:{contig:[fragment_ins, ...]}}
     join_flap = 10
     align_swing = 20
-    repeat_data = []
     for contig in fragments_data['head']:
+        block_array_container = []
+        array_id = 1
         for fragments in fragments_data['head'][contig]:
-            repeat_data.append(fragments.fragment)
-    group_id = 1
-    group = None
-    groups_container = []
-    for fragment in repeat_data:
-        if not group:
-            array_id = 1
-            group = Group_manager(group_id, fragment)
-            block_array = Block_array(fragment, array_id)
-            group.add_array(block_array)
-        else:
+            block_array_container.append(Block_array(fragments.fragment, array_id))
             array_id += 1
-            block_array = Block_array(fragment, array_id)
-            relation = group.mother_block_array.region_relation(block_array, join_flap)
-        if relation == 'self_separate_second' or relation == 'second_separate_self':
-            groups_container.append(group)
-            group = None
-        else:
-            group.mother_block_array.align_block_array(block_array)  # aling block array with mother block array.
-            correlation = group.analysis_correlation(align_swing)
+        group_id = 1
+        group = None
+        groups_container = []
+        iter_tmp = []
+        iter_marker = 0
+        while True:
+            for block_array in block_array_container:
+                if not group:
+                    group = Group_manager(group_id, block_array)
+                    group.add_array(block_array)
+                else:
+                    relation = group.mother_block_array.region_relation(block_array)
+                    if relation == 'self_separate_second' or relation == 'second_separate_self':
+                        iter_tmp.append(block_array)
+                    else:
+                        group.mother_block_array.align_block_array(block_array)
+                        correlation = group.analysis_correlation()
+                        if correlation:
+                            group.add(block_array)
+                            group.update_mother_block_array()
+                            iter_marker = 1
+                        else:
+                            iter_tmp.append(block_array)
+            if iter_marker:
+                block_array_container = iter_tmp
+            else:
+                block_array_container = iter_tmp
+                groups_container.append(group)
+                group = None
+            if len(block_array_container) == 0:
+                break
+
+
+
 
 
 def thread_worker(args_in):
