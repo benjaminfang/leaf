@@ -619,35 +619,59 @@ class Block:
             self.righ_block = other
             self.right_block_relation = 'separate'
             self.right_block_origin = origin
+            other.left_block = self
+            other.left_block_relation = 'separate'
+            other.left_block_origin = origin
         elif relation == 'self_joined_second':
             self.righ_block = other
             self.right_block_relation = 'joined'
             self.right_block_origin = origin
+            other.left_block = self
+            other.left_block_relation = 'joined'
+            other.left_block_origin = origin
         elif relation == 'self_overlap_second':
             self.righ_block = other
             self.right_block_relation = 'overlap'
             self.right_block_origin = origin
+            other.left_block = self
+            other.left_block_relation = 'overlap'
+            other.left_block_origin = origin
         elif relation == 'self_cover_second':
             self.other_i_cover_block.append(other)
             self.other_i_cover_block_origin.append(origin)
+            other.other_cover_me_block.append(self)
+            other.other_cover_me_block_origin.append(origin)
         elif relation == 'second_separate_self':
             self.left_block = other
             self.left_block_relation = 'separate'
             self.left_block_origin = origin
+            other.righ_block = self
+            other.right_block_relation = 'separate'
+            other.right_block_origin = origin
         elif relation == 'second_joined_self':
             self.left_block = other
             self.left_block_relation = 'joined'
             self.left_block_origin = origin
+            other.right_block = self
+            other.right_block_relation = 'joined'
+            other.right_block_origin = origin
         elif relation == 'second_overlap_self':
             self.left_block = other
             self.left_block_relation = 'overlap'
             self.left_block_origin = origin
+            other.righ_block = self
+            other.right_block_relation = 'overlap'
+            other.right_block_origin = origin
         elif relation == 'second_cover_self':
             self.other_cover_me_block.append(other)
             self.other_cover_me_block_origin.append(origin)
+            other.other_i_cover_block.append(self)
+            other.other_i_cover_block_origin.append(origin)
         elif relation == 'self_equal_second':
             self.equal_block.append(other)
             self.equal_block_origin.append(origin)
+            other.equal_block.append(self)
+            other.equal_block_origin.append(origin)
         else:
             raise Exception('relation not exist.')
 
@@ -681,6 +705,7 @@ class Block_array(Block):
             for ele in fragments[1:]:
                 second_block = Block(ele, block_id, array_id)
                 first_block.link(second_block)
+                second_block.link(first_block)
                 first_block = second_block
                 block_id += 1
             return dt_out
@@ -777,6 +802,70 @@ class Group_manager:
             else:
                 return False
 
+    def undate_mother_block_array(self):
+        while True:
+            i = 0
+            for block in self.mother_block_array:
+                if len(block.other_cover_me_block) > 0:
+                    i += 1
+                    new = block.other_cover_me_block[0]
+                    for ele in block.other_cover_me_block:
+                        if ele.width > new.width:
+                            new = ele
+                    block.start = new.start
+                    block.width = new.width
+                    block.region = new.region
+                    block.other_cover_me_block = []
+                    block.other_i_cover_block_origin = []
+                if block.left_block:
+                    if block.left_block_relation == 'joined':
+                        i += 1
+                        block.start = block.left_block.start
+                        block.region = [block.left_block.start, block.region[1]]
+                        block.width = block.region[1] - block.region[0] + 1
+                        if block.left_block.left_block:
+                            block.link(block.left_block.left_block)
+                        else:
+                            block.left_block = None
+                            block.left_block_relation = None
+                            block.left_block_origin = None
+                    elif block.left_block_relation == 'overlap':
+                        i += 1
+                        block.start = block.left_block.start
+                        block.region = [block.left_block.start, block.region[1]]
+                        block.width = block.region[1] - block.region[0] + 1
+                        if block.left_block.left_block:
+                            block.link(block.left_block.left_block)
+                if block.righ_block:
+                    if block.right_block:
+                        if block.right_block_relation == 'joined':
+                            i += 1
+                            block.region = [block.region[0], block.righ_block.region[1]]
+                            block.width = block.region[1] - block.region[0] + 1
+                            if block.righ_block.righ_block:
+                                block.link(block.right_block.right_block)
+                            else:
+                                block.right_block = None
+                                block.right_block_relation = None
+                                block.right_block_origin = None
+                        elif block.right_block_relation == 'overlap':
+                            i += 1
+                            block.region = [block.region[0], block.righ_block.region[1]]
+                            block.width = block.region[1] - block.region[0] + 1
+                            if block.right_block.right_block:
+                                block.link(block.right_block.right_block)
+                            else:
+                                block.righ_block = None
+                                block.right_block_relation = None
+                                block.right_block_origin = None
+            if i == 0:
+                break
+        i = 1
+        for block in self.mother_block_array:
+            block.array_id = 0
+            block.block_id = i
+            i += 1
+
 
 def group_repeat(fragments_data):
     # NOTE: fragment_data: {file_name:str, head:{contig:[fragment_ins, ...]}}
@@ -818,6 +907,8 @@ def group_repeat(fragments_data):
                 group = None
             if len(block_array_container) == 0:
                 break
+        fragments_data['head'][contig] = groups_container
+    return fragments_data
 
 
 def thread_worker(args_in):
