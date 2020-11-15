@@ -558,9 +558,17 @@ class Block:
         self.other_i_cover_block_origin = []
         self.equal_block = []
         self.equal_block_origin = []
+        self.next = self
+
+    def __iter__(self):
+        return self
 
     def __next__(self):
-        pass
+        if not self.next:
+            raise StopIteration
+        out = self.next
+        self.next = self.next.right_block
+        return out
 
     def region_relation(self, obj_b, join_flap=10, cover_flap=5):
         cover_flap += 1
@@ -657,9 +665,10 @@ class Block:
         self.equal_block = []
         self.equal_block_origin = []
 
-    def block_nighbors(self):
-        return [[self.left_block, self.left_block_relation, self.left_block_origin],
-            [self.righ_block, self.right_block_relation, self.right_block_origin]]
+    def distance(self, other):
+        dis1 = self.region[0] - other.region[1] - 1
+        dis2 = other.region[0] - self.region[1] - 1
+        return dis1 if dis1 > 0 else dis2
 
 
 class Block_array(Block):
@@ -695,6 +704,7 @@ class Block_array(Block):
             'self_cover_second': (0, 1), 'self_equal_second': (0, 2), 'second_cover_self': (0, 3),
             'second_separate_self': (-1, 1), 'second_joined_self': (-1, 2), 'second_overlap_self': (-1, 3)}
         for block_a in other:
+            block_a.unlink()
             block_relation_seq = []
             for block in self:
                 relation = block.region_relation(block_a)
@@ -720,28 +730,56 @@ class Block_array(Block):
                 block_relation_seq[0][1].link(block_a)
         return 0
 
-    def link_block_array(self):
-        for block in
-
 
 class Group_manager:
     def __inti__(self, group_id, mother_block_array):
         self.group_id = group_id
+        mother_block_array.array_id = 0
         self.mother_block_array = mother_block_array
         self.member_arrays = []
 
     def add_array(self, array):
         self.member_arrays.append(array)
 
-    def analysis_correlation(self, align_swing):
-        # NOTE: give correlation, update mother array, unset mother array links.
-        return 0
+    def analysis_correlation(self, align_swing=20):
+        def whether_eq(num, align_swing):
+            up = num[0] + align_swing
+            down = num[0] - align_swing
+            for ele in num[1:]:
+                if ele > up or ele < down:
+                    return False
+            return True
+
+        for ele in self.mother_block_array:
+            if ele.right_block:
+                if ele.right_block_relation == 'overlap' or ele.right_block_relation == 'joined':
+                    return True
+                elif len(ele.other_i_cover_block) > 0 or len(ele.other_cover_me_block) > 0 or len(ele.equal_block) > 0:
+                    return True
+        pattern = []
+        left_dis = []
+        right_dis = []
+        i = 0
+        for ele in self.mother_block_array:
+            i += 1
+            if ele.array_id == 0:
+                pattern.append(i)
+                i = 0
+                if ele.left_block is not None:
+                    left_dis.append(ele.distance(ele.left_block))
+                if ele.righ_block is not None:
+                    right_dis.append(ele.distance(ele.right_block))
+        if len(set(pattern[1:])) > 1:
+            return False
+        else:
+            if whether_eq(left_dis) or whether_eq(right_dis):
+                return True
+            else:
+                return False
 
 
 def group_repeat(fragments_data):
     # NOTE: fragment_data: {file_name:str, head:{contig:[fragment_ins, ...]}}
-    join_flap = 10
-    align_swing = 20
     for contig in fragments_data['head']:
         block_array_container = []
         array_id = 1
@@ -776,12 +814,10 @@ def group_repeat(fragments_data):
             else:
                 block_array_container = iter_tmp
                 groups_container.append(group)
+                group_id += 1
                 group = None
             if len(block_array_container) == 0:
                 break
-
-
-
 
 
 def thread_worker(args_in):
