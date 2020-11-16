@@ -690,6 +690,7 @@ class Block:
         self.equal_block_origin = []
 
     def distance(self, other):
+        # NOTE: always used to calculate distance of two separating blocks.
         dis1 = self.region[0] - other.region[1] - 1
         dis2 = other.region[0] - self.region[1] - 1
         return dis1 if dis1 > 0 else dis2
@@ -705,7 +706,6 @@ class Block_array(Block):
             for ele in fragments[1:]:
                 second_block = Block(ele, block_id, array_id)
                 first_block.link(second_block)
-                second_block.link(first_block)
                 first_block = second_block
                 block_id += 1
             return dt_out
@@ -747,8 +747,8 @@ class Block_array(Block):
                     if ele == -1:
                         break
                     i += 1
+                block_relation_seq[i][1].link(block_a)
                 block_relation_seq[i - 1][1].link(block_a)
-                block_relation_seq[i - 2][1].link(block_a)
             elif 1 in tmp:
                 block_relation_seq[-1][1].link(block_a)
             elif -1 in tmp:
@@ -858,6 +858,7 @@ class Group_manager:
                                 block.righ_block = None
                                 block.right_block_relation = None
                                 block.right_block_origin = None
+                break
             if i == 0:
                 break
         i = 1
@@ -872,8 +873,12 @@ def group_repeat(fragments_data):
     for contig in fragments_data['head']:
         block_array_container = []
         array_id = 1
+        fragments_of_one_contig = []
         for fragments in fragments_data['head'][contig]:
-            block_array_container.append(Block_array(fragments.fragment, array_id))
+            fragments_of_one_contig.append(fragments.fragment)
+        fragments_of_one_contig.sort(key=lambda x: x[0][0])
+        for fragment in fragments_of_one_contig:
+            block_array_container.append(Block_array(fragment, array_id))
             array_id += 1
         group_id = 1
         group = None
