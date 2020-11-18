@@ -558,9 +558,9 @@ class Block:
         self.other_i_cover_block_origin = []
         self.equal_block = []
         self.equal_block_origin = []
-        self.next = self
 
     def __iter__(self):
+        self.next = self
         return self
 
     def __next__(self):
@@ -616,21 +616,21 @@ class Block:
         else:
             origin = 'diff'
         if relation == 'self_separate_second':
-            self.righ_block = other
+            self.right_block = other
             self.right_block_relation = 'separate'
             self.right_block_origin = origin
             other.left_block = self
             other.left_block_relation = 'separate'
             other.left_block_origin = origin
         elif relation == 'self_joined_second':
-            self.righ_block = other
+            self.right_block = other
             self.right_block_relation = 'joined'
             self.right_block_origin = origin
             other.left_block = self
             other.left_block_relation = 'joined'
             other.left_block_origin = origin
         elif relation == 'self_overlap_second':
-            self.righ_block = other
+            self.right_block = other
             self.right_block_relation = 'overlap'
             self.right_block_origin = origin
             other.left_block = self
@@ -645,7 +645,7 @@ class Block:
             self.left_block = other
             self.left_block_relation = 'separate'
             self.left_block_origin = origin
-            other.righ_block = self
+            other.right_block = self
             other.right_block_relation = 'separate'
             other.right_block_origin = origin
         elif relation == 'second_joined_self':
@@ -659,7 +659,7 @@ class Block:
             self.left_block = other
             self.left_block_relation = 'overlap'
             self.left_block_origin = origin
-            other.righ_block = self
+            other.right_block = self
             other.right_block_relation = 'overlap'
             other.right_block_origin = origin
         elif relation == 'second_cover_self':
@@ -722,6 +722,7 @@ class Block_array(Block):
             left_block = block.left_block
             if not left_block:
                 break
+        block.next = block
         return block
 
     def align_block_array(self, other):
@@ -792,7 +793,7 @@ class Group_manager:
                 i = 0
                 if ele.left_block is not None:
                     left_dis.append(ele.distance(ele.left_block))
-                if ele.righ_block is not None:
+                if ele.right_block is not None:
                     right_dis.append(ele.distance(ele.right_block))
         if len(set(pattern[1:])) > 1:
             return False
@@ -836,13 +837,13 @@ class Group_manager:
                         block.width = block.region[1] - block.region[0] + 1
                         if block.left_block.left_block:
                             block.link(block.left_block.left_block)
-                if block.righ_block:
+                if block.right_block:
                     if block.right_block:
                         if block.right_block_relation == 'joined':
                             i += 1
-                            block.region = [block.region[0], block.righ_block.region[1]]
+                            block.region = [block.region[0], block.right_block.region[1]]
                             block.width = block.region[1] - block.region[0] + 1
-                            if block.righ_block.righ_block:
+                            if block.right_block.right_block:
                                 block.link(block.right_block.right_block)
                             else:
                                 block.right_block = None
@@ -850,12 +851,12 @@ class Group_manager:
                                 block.right_block_origin = None
                         elif block.right_block_relation == 'overlap':
                             i += 1
-                            block.region = [block.region[0], block.righ_block.region[1]]
+                            block.region = [block.region[0], block.right_block.region[1]]
                             block.width = block.region[1] - block.region[0] + 1
                             if block.right_block.right_block:
                                 block.link(block.right_block.right_block)
                             else:
-                                block.righ_block = None
+                                block.right_block = None
                                 block.right_block_relation = None
                                 block.right_block_origin = None
                 break
