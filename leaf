@@ -987,8 +987,6 @@ def thread_worker(args_in):
     fasta_dt = Fasta_parser(file_name)
     fasta_dt.join_lines()
     for head in fasta_dt.data:
-        print('===============================================================')
-        print(head)
         head_name = head.split()[0]
         data['head'][head_name] = []
         # NOTE: save item sequence to a file and make blast datebase.
@@ -1001,33 +999,23 @@ def thread_worker(args_in):
         # NOTE: fragment_res is iterable, and yeild by provide_init_seed_match_list function.
         fragment_res = provide_init_seed_match_list(seed, blastdb, seed_length, identity_cutoff, coverage_cutoff, sub_tmp_dir, whole_seq_length)
         for frag in fragment_res:
-            print('1 initial fragment:', frag.fragment)
             # NOTE: First exapnd up side by length of seed and lock up side.
             fragment_ins, expand_len_act = frag.expand_fragment('up', seed_length)
-            print('2 fragment up elonged actually elonged length:', fragment_ins.fragment, expand_len_act)
             fragment_ins.lock_up()
             water_compare_res = align_fragment_water(fragment_ins, sub_tmp_dir, item_sequence)
-            print('3 water align res:', water_compare_res)
             boundarys = detect_boundary(fragment_ins, water_compare_res, 'up', expand_len_act, 15)
-            print('4 up boundarys fixed:', boundarys)
             transite_location(fragment_ins, boundarys, 'up')
-            print('5 transite to abs positon:', fragment_ins.fragment)
-            print('--------------------')
             while True:
                 if fragment_ins.down_lock:
                     break
                 fragment_ins, expand_len_act = fragment_ins.expand_fragment('down', expand_length)
-                print('l1 fragment down elonged', fragment_ins.fragment, expand_len_act)
                 if expand_len_act < expand_length:
                     fragment_ins.lock_down()
                 water_compare_res = align_fragment_water(fragment_ins, sub_tmp_dir, item_sequence)
-                print('l2 water align res:', water_compare_res)
                 boundarys = detect_boundary(fragment_ins, water_compare_res, 'down', expand_len_act, 15)
-                print('l3 boundarys', boundarys)
                 if whether_lock_down(fragment_ins, boundarys, lock_base_cutoff):
                     fragment_ins.lock_down()
             transite_location(fragment_ins, boundarys, 'down')
-            print('6 transieted positon:', fragment_ins.fragment)
             for ele in fragment_ins.fragment:
                 seed.trim_seed_island([ele[0], ele[1]])
             data['head'][head_name].append(fragment_ins)
