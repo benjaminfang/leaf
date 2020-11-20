@@ -909,14 +909,16 @@ def group_repeat(fragments_data):
         block_array_container = []
         fragments_of_one_contig = []
         for fragments in fragments_data['head'][contig]:
-            fragments_of_one_contig.append(fragments)
+            fragments_of_one_contig.append(fragments.fragment)
         fragments_of_one_contig.sort(key=lambda x: x[0][0])
         array_id = 1
         for fragment in fragments_of_one_contig:
             block_list = []
             block_id = 1
             for ele in fragment:
-                block_list.append(Block(ele[0], ele[1], block_id, array_id))
+                block = Block(ele[0], ele[1], block_id, array_id)
+                block.orientation = ele[2]
+                block_list.append(block)
                 block_id += 1
             block_array_container.append(Block_array(block_list, array_id))
             array_id += 1
@@ -964,11 +966,11 @@ def print_res(data, f_out):
         for group in data['head'][contig]:
             group_id = group.group_id
             print('>' + '\t'.join(['gid_' + str(group_id) + '_' + contig, strain]), file=f_out)
-            print('$' + '\t'.join([','.join([ele.start, ele.end]) for ele in group.mother_block_array]), file=f_out)
+            print('$' + '\t'.join([','.join([str(ele.start), str(ele.end)]) for ele in group.mother_block_array]), file=f_out)
             for member in group.member_arrays:
                 tmp = []
                 for block in member:
-                    tmp.append(','.join([block.start, block.end, block.orientation]))
+                    tmp.append(','.join([str(block.start), str(block.end), block.orientation]))
                 print('\t'.join(tmp), file=f_out)
 
     return 0
