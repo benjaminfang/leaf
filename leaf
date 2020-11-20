@@ -964,14 +964,15 @@ def print_res(data, f_out):
     strain = data['file_name']
     for contig in data['head']:
         for group in data['head'][contig]:
-            group_id = group.group_id
-            print('>' + '\t'.join(['gid_' + str(group_id) + '_' + contig, strain]), file=f_out)
-            print('$' + '\t'.join([','.join([str(ele.start), str(ele.end)]) for ele in group.mother_block_array]), file=f_out)
-            for member in group.member_arrays:
-                tmp = []
-                for block in member:
-                    tmp.append(','.join([str(block.start), str(block.end), block.orientation]))
-                print('\t'.join(tmp), file=f_out)
+            if group:
+                group_id = group.group_id
+                print('>' + '\t'.join(['gid_' + str(group_id) + '_' + contig, strain]), file=f_out)
+                print('$' + '\t'.join([','.join([str(ele.start), str(ele.end)]) for ele in group.mother_block_array]), file=f_out)
+                for member in group.member_arrays:
+                    tmp = []
+                    for block in member:
+                        tmp.append(','.join([str(block.start), str(block.end), block.orientation]))
+                    print('\t'.join(tmp), file=f_out)
 
     return 0
 
