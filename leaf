@@ -806,9 +806,7 @@ class Group_manager:
                     left_dis.append(ele.distance(ele.left_block))
                 if ele.right_block is not None and ele.right_block_origin == 'diff':
                     right_dis.append(ele.distance(ele.right_block))
-        for ele in self.mother_block_array:
-            print(ele.region)
-        print(left_dis, right_dis)
+        print('distance', left_dis, right_dis)
         if whether_eq(left_dis, align_swing) or whether_eq(right_dis, align_swing):
             return True
         else:
@@ -932,7 +930,12 @@ def group_repeat(fragments_data):
             iter_tmp = []
             iter_marker = 0
             for block_array in block_array_container:
+                print('block_array:', end='')
+                for ele in block_array:
+                    print(ele.region, end=' ')
+                print()
                 if not group:
+                    print('start new group.')
                     group = Group_manager(group_id, block_array)
                     group.add_array(block_array)
                 else:
@@ -940,8 +943,16 @@ def group_repeat(fragments_data):
                     if relation == 'self_separate_second' or relation == 'second_separate_self':
                         iter_tmp.append(block_array)
                     else:
+                        print('meger into mother')
+                        for ele in group.mother_block_array:
+                            print(ele.region, end=' ')
+                        print()
                         block_array_copy = block_array.copy_array()
                         group.mother_block_array.align_block_array(block_array_copy)
+                        print('after merge.')
+                        for ele in group.mother_block_array:
+                            print(ele.region, end=' ')
+                        print()
                         correlation = group.analysis_correlation()
                         if correlation:
                             group.add_array(block_array)
