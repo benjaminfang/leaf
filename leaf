@@ -798,6 +798,8 @@ class Group_manager:
                     return True
                 elif len(ele.other_i_cover_block) > 0 or len(ele.other_cover_me_block) > 0 or len(ele.equal_block) > 0:
                     return True
+        return False
+        # NOTE: following code was abandened.
         left_dis = []
         right_dis = []
         for ele in self.mother_block_array:
@@ -930,12 +932,7 @@ def group_repeat(fragments_data):
             iter_tmp = []
             iter_marker = 0
             for block_array in block_array_container:
-                print('block_array:', end='')
-                for ele in block_array:
-                    print(ele.region, end=' ')
-                print()
                 if not group:
-                    print('start new group.')
                     group = Group_manager(group_id, block_array)
                     group.add_array(block_array)
                 else:
@@ -943,16 +940,8 @@ def group_repeat(fragments_data):
                     if relation == 'self_separate_second' or relation == 'second_separate_self':
                         iter_tmp.append(block_array)
                     else:
-                        print('meger into mother')
-                        for ele in group.mother_block_array:
-                            print(ele.region, end=' ')
-                        print()
                         block_array_copy = block_array.copy_array()
                         group.mother_block_array.align_block_array(block_array_copy)
-                        print('after merge.')
-                        for ele in group.mother_block_array:
-                            print(ele.region, end=' ')
-                        print()
                         correlation = group.analysis_correlation()
                         if correlation:
                             group.add_array(block_array)
@@ -961,14 +950,14 @@ def group_repeat(fragments_data):
                         else:
                             group.reset_mother_block_array()
                             iter_tmp.append(block_array)
-            if iter_marker:
+            if iter_marker and len(iter_tmp) > 0:
                 block_array_container = iter_tmp
-            else:
+            elif len(iter_tmp) > 0:
                 block_array_container = iter_tmp
                 groups_container.append(group)
                 group_id += 1
                 group = None
-            if len(block_array_container) == 0:
+            else:
                 break
         fragments_data['head'][contig] = groups_container
     return fragments_data
