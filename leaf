@@ -792,13 +792,16 @@ class Group_manager:
             return True
 
         for ele in self.mother_block_array:
-            if ele.array_id == 0:
-                if ele.left_block_relation == 'overlap' or ele.left_block_relation == 'joined' or\
-                        ele.right_block_relation == 'overlap' or ele.right_block_relation == 'joined':
-                    return True
-                elif len(ele.other_i_cover_block) > 0 or len(ele.other_cover_me_block) > 0 or len(ele.equal_block) > 0:
-                    return True
-        return False
+            if ele.array_id == 0 and ele.left_block_origin == 'diff' and \
+                    (ele.left_block_relation == 'overlap' or ele.left_block_relation == 'joined'):
+                return True
+            elif ele.array_id == 0 and ele.right_block_origin == 'diff' and \
+                    (ele.right_block_relation == 'overlap' or ele.right_block_relation == 'joined'):
+                return True
+            elif len(ele.other_i_cover_block) > 0 or len(ele.other_cover_me_block) > 0 or len(ele.equal_block) > 0:
+                return True
+            else:
+                False
         # NOTE: following code was abandened.
         left_dis = []
         right_dis = []
